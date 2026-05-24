@@ -138,7 +138,7 @@ def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key
         "title": title,
         "version": version,
         "ownerRoleBoundary": "ADMIN",
-        "supportedDataSources": ["LINKMERCE_POSTGRES"],
+        "supportedDataSources": ["POSTGRES"],
         "pages": [
             {
                 "id": "page-overview",

@@ -32,7 +32,7 @@ STARTER_DATASET_MANIFESTS: tuple[DatasetManifest, ...] = (
         label="Commerce Daily",
         description="Daily Linkmerce commerce performance aggregated by date, channel, and store.",
         source=DatasetSource(
-            kind=DataSourceKind.LINKMERCE_POSTGRES,
+            kind=DataSourceKind.POSTGRES,
             relation="analytics.mart_commerce_daily",
         ),
         dimensions=[
@@ -98,7 +98,7 @@ STARTER_DATASET_MANIFESTS: tuple[DatasetManifest, ...] = (
         label="Channel Performance",
         description="Channel-level Linkmerce performance for campaign monitoring and diagnostics.",
         source=DatasetSource(
-            kind=DataSourceKind.LINKMERCE_POSTGRES,
+            kind=DataSourceKind.POSTGRES,
             relation="analytics.mart_channel_performance",
         ),
         dimensions=[

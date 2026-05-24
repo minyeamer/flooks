@@ -56,8 +56,8 @@ The next implementation wave should add the following immediately:
 2. Delivered: `feat(backend)` for metadata persistence, including SQLAlchemy setup, the Alembic baseline, and the `/api/v1/metadata/bootstrap` contract for the first dashboard and access-control tables.
 3. Delivered: `feat(backend)` for the governed query bootstrap, including the dataset manifest registry plus `/api/v1/query/bootstrap` and `/api/v1/query/validate`.
 4. Delivered: `feat(backend)` for dashboard CRUD and versioned document persistence, including `/api/v1/dashboards` plus immutable dashboard revisions in the metadata store.
-5. Next: `feat(backend)` for connector-backed QuerySpec execution against the first Linkmerce PostgreSQL marts.
-6. Phase 6: `feat(frontend)` for the application shell, including routing, API client structure, and authenticated navigation surfaces.
+5. Delivered: `feat(backend)` for connector-backed QuerySpec execution against the first POSTGRES marts.
+6. Next: `feat(frontend)` for the application shell, including routing, API client structure, and authenticated navigation surfaces.
 7. Phase 7: `feat(frontend)` for dashboard runtime basics, including first-party table and scorecard panels wired to live API responses.
 8. Phase 8: `chore(infra)` for delivery hardening, including Compose health checks, developer entrypoints, CI-ready validation commands, and `ruff`-based static checks.
 

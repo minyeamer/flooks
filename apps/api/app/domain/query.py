@@ -172,3 +172,10 @@ class QueryValidationResponse(QueryModel):
     manifest: DatasetManifest
     normalized_spec: QuerySpec
     execution_plan: ExecutionPlanPreview
+
+
+class QueryExecutionResponse(QueryModel):
+    results: list[dict[str, QueryScalarValue]]
+    column_names: list[str]
+    row_count: int
+    execution_metadata: dict[str, QueryScalarValue] = Field(default_factory=dict)

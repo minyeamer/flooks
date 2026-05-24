@@ -3,7 +3,7 @@ export const systemRoles = ['OWNER', 'ADMIN', 'EDITOR', 'VIEWER'] as const;
 export type SystemRole = (typeof systemRoles)[number];
 
 export const dataSourceKinds = [
-  'LINKMERCE_POSTGRES',
+  'POSTGRES',
   'BIGQUERY',
   'CLICKHOUSE',
   'JDBC',
@@ -67,7 +67,7 @@ export const starterDashboard: DashboardDocument = {
   title: 'Commerce Executive Overview',
   version: 1,
   ownerRoleBoundary: 'ADMIN',
-  supportedDataSources: ['LINKMERCE_POSTGRES'],
+  supportedDataSources: ['POSTGRES'],
   pages: [
     {
       id: 'page-overview',

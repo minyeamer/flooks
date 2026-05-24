@@ -21,7 +21,7 @@ def test_query_bootstrap() -> None:
 
     assert payload["rules"]["rawSqlAllowed"] is False
     assert payload["rules"]["datasetManifestRequired"] is True
-    assert payload["rules"]["executionPreviewOnly"] is True
+    assert payload["rules"]["executionPreviewOnly"] is False
     assert [dataset["key"] for dataset in payload["datasets"]] == [
         "mart_channel_performance",
         "mart_commerce_daily",
@@ -48,7 +48,7 @@ def test_query_validate_normalizes_limit_and_default_filters() -> None:
     assert body["valid"] is True
     assert body["normalizedSpec"]["limit"] == 5000
     assert body["executionPlan"]["defaultFilterCount"] == 1
-    assert body["executionPlan"]["connectorKind"] == "LINKMERCE_POSTGRES"
+    assert body["executionPlan"]["connectorKind"] == "POSTGRES"
     assert body["normalizedSpec"]["filters"][0] == {
         "field": "workspace_key",
         "op": "eq",

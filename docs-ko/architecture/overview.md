@@ -56,8 +56,8 @@ FLooks는 Linkmerce 기반 분석 데이터를 안전하게 소비하고, 권한
 2. Delivered: `feat(backend)` 범위로 metadata persistence를 추가했고, SQLAlchemy 설정, Alembic baseline, `/api/v1/metadata/bootstrap` 계약에 첫 dashboard 및 access-control table 기준을 담았다.
 3. Delivered: `feat(backend)` 범위로 governed query bootstrap을 추가했고, dataset manifest registry와 `/api/v1/query/bootstrap`, `/api/v1/query/validate` 계약을 열었다.
 4. Delivered: `feat(backend)` 범위로 dashboard CRUD 및 versioned document persistence를 추가했고, `/api/v1/dashboards` 계약과 immutable revision 저장 흐름을 열었다.
-5. Next: `feat(backend)` 범위로 Linkmerce PostgreSQL mart 대상의 connector-backed QuerySpec execution을 만든다.
-6. Phase 6: `feat(frontend)` 범위로 application shell을 확장하고, 라우팅, API client 구조, 인증 뒤 navigation surface를 만든다.
+5. Delivered: `feat(backend)` 범위로 POSTGRES mart 대상의 connector-backed QuerySpec execution을 추가했다.
+6. Next: `feat(frontend)` 범위로 application shell을 확장하고, 라우팅, API client 구조, 인증 뒤 navigation surface를 만든다.
 7. Phase 7: `feat(frontend)` 범위로 dashboard runtime basics를 추가하고, live API 응답을 쓰는 first-party table 및 scorecard panel을 만든다.
 8. Phase 8: `chore(infra)` 범위로 delivery hardening을 진행하고, Compose health check, developer entrypoint, CI-ready validation 명령, `ruff` 기반 정적 체크를 정리한다.
 

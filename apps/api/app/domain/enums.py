@@ -13,7 +13,7 @@ class SystemRole(StrEnum):
 
 
 class DataSourceKind(StrEnum):
-    LINKMERCE_POSTGRES = "LINKMERCE_POSTGRES"
+    POSTGRES = "POSTGRES"
     BIGQUERY = "BIGQUERY"
     CLICKHOUSE = "CLICKHOUSE"
     JDBC = "JDBC"

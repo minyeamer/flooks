@@ -25,7 +25,7 @@ def test_system_metadata() -> None:
     payload = response.json()
 
     assert payload["name"] == "FLooks API"
-    assert "LINKMERCE_POSTGRES" in payload["dataSources"]
+    assert "POSTGRES" in payload["dataSources"]
     assert "OWNER" in payload["roles"]
 
 

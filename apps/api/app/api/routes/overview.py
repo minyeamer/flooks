@@ -127,8 +127,14 @@ async def get_overview() -> OverviewResponse:
             DeliveryStep(
                 id="connector-query-execution",
                 title="Connector-backed query execution",
-                status="in_progress",
-                outcome="The next runtime slice is turning validated QuerySpec requests into connector executions against the first database-backed marts.",
+                status="done",
+                outcome="Validated QuerySpec requests are now translated into SQL and executed against the POSTGRES database connector.",
+            ),
+            DeliveryStep(
+                id="panel-runtime",
+                title="Panel runtime and UI components",
+                status="next",
+                outcome="The next runtime slice will focus on the React-based panel runtime consuming the live query execution API.",
             ),
         ],
         service_links=[
