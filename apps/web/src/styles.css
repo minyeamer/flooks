@@ -1,0 +1,396 @@
+:root {
+  color-scheme: light;
+  font-family: 'IBM Plex Sans KR', 'IBM Plex Sans', 'Noto Sans KR', sans-serif;
+  --bg: #f5efe1;
+  --panel: rgba(255, 252, 245, 0.86);
+  --panel-strong: #fffaf0;
+  --ink: #18222d;
+  --muted: #5b6873;
+  --line: rgba(24, 34, 45, 0.1);
+  --accent: #0f766e;
+  --accent-soft: rgba(15, 118, 110, 0.12);
+  --accent-2: #d97706;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 28%),
+    radial-gradient(circle at 85% 10%, rgba(217, 119, 6, 0.18), transparent 24%),
+    linear-gradient(180deg, #f7f2e8 0%, #eee3ce 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.shell {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
+  gap: 20px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  max-width: 12ch;
+  font-size: clamp(2.8rem, 7vw, 5rem);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+}
+
+.lede {
+  margin-top: 18px;
+  max-width: 58ch;
+  font-size: 1.02rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.heroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.heroHint {
+  color: var(--muted);
+  font-size: 0.96rem;
+}
+
+.inlineNotice {
+  margin-top: 12px;
+  color: #9a3412;
+  font-size: 0.94rem;
+}
+
+.heroCard,
+.panel,
+.card {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 22px 60px rgba(32, 33, 36, 0.08);
+}
+
+.heroCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(15, 118, 110, 0.12), transparent 55%),
+    var(--panel-strong);
+}
+
+.heroCardLabel,
+.chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.statusBadgeloading {
+  background: rgba(24, 34, 45, 0.08);
+  color: var(--ink);
+}
+
+.statusBadgeready {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.statusBadgeerror {
+  background: rgba(154, 52, 18, 0.12);
+  color: #9a3412;
+}
+
+.heroCard strong {
+  font-size: 1.4rem;
+}
+
+.heroCard span:last-child {
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.panel {
+  padding: 24px;
+}
+
+.panelWide {
+  grid-column: 1 / -1;
+}
+
+.panelHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.metricCard,
+.stepItem,
+.linkItem {
+  border-radius: 18px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.metricCard {
+  padding: 18px;
+}
+
+.metricCard span,
+.kicker,
+.linkUrl {
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.metricCard span,
+.kicker {
+  color: var(--accent);
+}
+
+.metricCard strong {
+  display: block;
+  margin: 12px 0 10px;
+  font-size: 2.2rem;
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.metricCard p,
+.stepItem p,
+.linkItem p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.callout {
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px dashed rgba(24, 34, 45, 0.16);
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--muted);
+}
+
+.calloutError {
+  border-color: rgba(154, 52, 18, 0.2);
+  background: rgba(154, 52, 18, 0.06);
+  color: #9a3412;
+}
+
+.stepList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.stepItem {
+  padding: 18px;
+}
+
+.stepItemHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stepStatus {
+  display: inline-flex;
+  align-items: center;
+  height: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stepStatusDone {
+  background: rgba(15, 118, 110, 0.14);
+  color: var(--accent);
+}
+
+.stepStatusInProgress {
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--accent-2);
+}
+
+.stepStatusNext {
+  background: rgba(24, 34, 45, 0.08);
+  color: var(--ink);
+}
+
+.linkList {
+  display: grid;
+  gap: 12px;
+}
+
+.linkItem {
+  padding: 16px;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease;
+}
+
+.linkItem:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.28);
+  box-shadow: 0 18px 30px rgba(24, 34, 45, 0.08);
+}
+
+.linkItem strong {
+  margin-bottom: 6px;
+}
+
+.linkUrl {
+  margin-bottom: 8px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.card {
+  padding: 18px;
+}
+
+.card h3 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.card p,
+.list,
+.documentPreview p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.list.compact {
+  columns: 2;
+}
+
+.list li + li {
+  margin-top: 10px;
+}
+
+.documentPreview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.documentPreview div {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(24, 34, 45, 0.06);
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .grid,
+  .cards,
+  .documentPreview,
+  .metricGrid,
+  .stepList {
+    grid-template-columns: 1fr;
+  }
+
+  .shell {
+    width: min(100% - 20px, 1200px);
+    padding-top: 24px;
+  }
+
+  h1 {
+    max-width: none;
+  }
+
+  .list.compact {
+    columns: 1;
+  }
+}

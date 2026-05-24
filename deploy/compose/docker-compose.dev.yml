@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flooks_meta}
+      POSTGRES_USER: ${POSTGRES_USER:-flooks}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flooks}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      FLOOKS_ENV: development
+      FLOOKS_APP_NAME: FLooks API
+      FLOOKS_API_V1_PREFIX: /api/v1
+      FLOOKS_ALLOWED_ORIGINS: http://localhost:${FLOOKS_WEB_PORT:-5173}
+    ports:
+      - "${FLOOKS_API_PORT:-8000}:8000"
+    depends_on:
+      - postgres
+      - redis
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      VITE_API_BASE_URL: http://localhost:${FLOOKS_API_PORT:-8000}/api/v1
+    ports:
+      - "${FLOOKS_WEB_PORT:-5173}:5173"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:

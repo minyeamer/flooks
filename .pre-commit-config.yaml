@@ -1,0 +1,31 @@
+minimum_pre_commit_version: 3.7.0
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.1
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^apps/api/
+
+  - repo: local
+    hooks:
+      - id: api-compile
+        name: api-compile
+        entry: python3 -m compileall apps/api/app apps/api/tests
+        language: system
+        pass_filenames: false
+
+      - id: web-typecheck
+        name: web-typecheck
+        entry: npm run check:web
+        language: system
+        pass_filenames: false

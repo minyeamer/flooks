@@ -1,0 +1,22 @@
+{
+  "name": "flooks",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Flexible enterprise dashboard platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w @flooks/web",
+    "build:web": "npm run build -w @flooks/web",
+    "check:web": "npm run check -w @flooks/web",
+    "check:api": "python3 -m compileall apps/api/app apps/api/tests",
+    "check:compose": "docker compose -f deploy/compose/docker-compose.dev.yml config",
+    "validate": "npm run check:web && npm run check:api && npm run check:compose"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
