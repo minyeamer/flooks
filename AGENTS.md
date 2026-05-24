@@ -18,12 +18,17 @@ FLooks is an internal-first enterprise dashboard platform. Prioritize governed d
 3. Any dashboard document change must update `packages/dashboard-schema` first.
 4. Custom panels must stay behind a sandbox boundary.
 5. AI-related changes must preserve server-side authorization before model invocation.
+6. In `apps/api`, prefer explicit type annotations for public functions, response models, and domain contracts.
+7. In `apps/api`, prefer absolute imports rooted at `app` instead of relative imports unless a technical constraint requires otherwise.
+8. Add an English module docstring when creating or substantially editing backend runtime modules.
+9. Keep two blank lines between top-level Python definitions, one blank line between methods, and a trailing newline at the end of each Python file.
 
 ## Validation rules
 
 - Web changes: run `npm run build:web`
 - API changes: run `python3 -m compileall apps/api/app apps/api/tests`
 - Compose or deployment changes: run `docker compose -f deploy/compose/docker-compose.dev.yml config`
+- Plan to add `ruff`-based static checks for backend import, typing, and module conventions as part of the infra hardening phase.
 
 ## Commit message rules
 

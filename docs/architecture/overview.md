@@ -39,26 +39,26 @@ The core product principles are:
 
 ## Current state vs next state
 
-The repository is still at the skeleton stage, but it now includes a live bootstrap slice. The web shell reads `/api/v1/system` and `/api/v1/overview` from the FastAPI service so the current runtime state and immediate implementation order are visible without reading source files.
+The repository is still at the skeleton stage, but it now includes a live bootstrap slice plus an identity baseline slice. The web shell reads `/api/v1/system` and `/api/v1/overview` from the FastAPI service, and the API now exposes `/api/v1/identity/bootstrap` for the initial auth and permission contract.
 
-The parts that are already aligned are the monorepo layout, the React shell, the FastAPI skeleton, the live bootstrap overview surface, the dashboard schema package, and the Compose structure.
+The parts that are already aligned are the monorepo layout, the React shell, the FastAPI skeleton, the identity and overview bootstrap surfaces, the dashboard schema package, and the Compose structure.
 
 The next implementation wave should add the following immediately:
 
-1. the identity and permissions skeleton
-2. SQLAlchemy 2, Alembic, and metadata models
-3. the Dataset manifest loader and QuerySpec executor
-4. dashboard CRUD, versioning, and the panel runtime
-5. React Router, TanStack Query, TanStack Table, and Apache ECharts for the full application shell
+1. SQLAlchemy 2, Alembic, and metadata models
+2. the Dataset manifest loader and QuerySpec executor
+3. dashboard CRUD, versioning, and the panel runtime
+4. React Router, TanStack Query, TanStack Table, and Apache ECharts for the full application shell
+5. `ruff`-based static checks for backend import, typing, and module conventions
 
 ## Near-term execution plan
 
-1. Phase 1: `feat(backend)` for the identity and permissions skeleton, including email login contracts, approval flow scaffolding, and protected route boundaries.
-2. Phase 2: `feat(backend)` for metadata persistence, including SQLAlchemy setup, Alembic wiring, and the first dashboard and access-control tables.
+1. Delivered: `feat(backend)` for the identity and permissions skeleton, including the `/api/v1/identity/bootstrap` contract for email login policy, approval stages, and permission evaluation rules.
+2. Next: `feat(backend)` for metadata persistence, including SQLAlchemy setup, Alembic wiring, and the first dashboard and access-control tables.
 3. Phase 3: `feat(backend)` for governed query bootstrap, including dataset manifest loading, QuerySpec validation, and the first Linkmerce connector stub.
 4. Phase 4: `feat(frontend)` for the application shell, including routing, API client structure, and authenticated navigation surfaces.
 5. Phase 5: `feat(frontend)` for dashboard runtime basics, including first-party table and scorecard panels wired to live API responses.
-6. Phase 6: `chore(infra)` for delivery hardening, including Compose health checks, developer entrypoints, and CI-ready validation commands.
+6. Phase 6: `chore(infra)` for delivery hardening, including Compose health checks, developer entrypoints, CI-ready validation commands, and `ruff`-based static checks.
 
 ## Immediate references
 

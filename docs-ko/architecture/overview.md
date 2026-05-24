@@ -39,23 +39,23 @@ FLooks는 Linkmerce 기반 분석 데이터를 안전하게 소비하고, 권한
 
 ## Current state vs next state
 
-현재 저장소는 아직 skeleton 단계지만, 이제 라이브 bootstrap slice가 들어가 있다. 웹 셸은 FastAPI의 `/api/v1/system` 과 `/api/v1/overview` 를 읽어서 현재 런타임 상태와 다음 구현 순서를 코드 열람 없이 바로 보여준다.
+현재 저장소는 아직 skeleton 단계지만, 이제 라이브 bootstrap slice와 identity baseline slice가 들어가 있다. 웹 셸은 FastAPI의 `/api/v1/system` 과 `/api/v1/overview` 를 읽어서 현재 런타임 상태와 다음 구현 순서를 코드 열람 없이 바로 보여주고, API는 초기 auth 및 permission 계약을 위해 `/api/v1/identity/bootstrap` 을 노출한다.
 
-이미 맞게 잡힌 축은 모노레포, React shell, FastAPI skeleton, 라이브 bootstrap overview surface, dashboard schema package, Compose 구조다.
+이미 맞게 잡힌 축은 모노레포, React shell, FastAPI skeleton, identity 및 overview bootstrap surface, dashboard schema package, Compose 구조다.
 
 다음 구현 파동에서 바로 추가될 축은 아래와 같다.
 
-1. identity 및 permissions skeleton
-2. SQLAlchemy 2, Alembic, metadata models
-3. Dataset manifest loader와 QuerySpec executor
-4. Dashboard CRUD, versioning, panel runtime
-5. 전체 앱 셸을 위한 React Router, TanStack Query, TanStack Table, Apache ECharts
+1. SQLAlchemy 2, Alembic, metadata models
+2. Dataset manifest loader와 QuerySpec executor
+3. Dashboard CRUD, versioning, panel runtime
+4. 전체 앱 셸을 위한 React Router, TanStack Query, TanStack Table, Apache ECharts
+5. backend import, typing, module 규칙을 위한 `ruff` 기반 정적 체크
 
 ## Near-term execution plan
 
-1. Phase 1: `feat(backend)` 범위로 identity 및 permissions skeleton을 추가하고, 이메일 로그인 계약, 승인 플로우 scaffolding, 보호된 라우트 경계를 만든다.
-2. Phase 2: `feat(backend)` 범위로 metadata persistence를 추가하고, SQLAlchemy 설정, Alembic 연결, 첫 dashboard 및 access-control 테이블을 만든다.
+1. Delivered: `feat(backend)` 범위로 identity 및 permissions skeleton을 추가했고, `/api/v1/identity/bootstrap` 계약에 이메일 로그인 정책, 승인 단계, permission evaluation rule을 담았다.
+2. Next: `feat(backend)` 범위로 metadata persistence를 추가하고, SQLAlchemy 설정, Alembic 연결, 첫 dashboard 및 access-control 테이블을 만든다.
 3. Phase 3: `feat(backend)` 범위로 governed query bootstrap을 추가하고, dataset manifest loading, QuerySpec validation, 첫 Linkmerce connector stub을 만든다.
 4. Phase 4: `feat(frontend)` 범위로 application shell을 확장하고, 라우팅, API client 구조, 인증 뒤 navigation surface를 만든다.
 5. Phase 5: `feat(frontend)` 범위로 dashboard runtime basics를 추가하고, live API 응답을 쓰는 first-party table 및 scorecard panel을 만든다.
-6. Phase 6: `chore(infra)` 범위로 delivery hardening을 진행하고, Compose health check, developer entrypoint, CI-ready validation 명령을 정리한다.
+6. Phase 6: `chore(infra)` 범위로 delivery hardening을 진행하고, Compose health check, developer entrypoint, CI-ready validation 명령, `ruff` 기반 정적 체크를 정리한다.

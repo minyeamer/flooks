@@ -17,6 +17,7 @@ The primary architecture and stack rationale lives in [docs/architecture/platfor
 
 - Vite + React frontend shell in `apps/web`
 - FastAPI backend skeleton in `apps/api`
+- Identity and permissions bootstrap endpoint in `apps/api`
 - Live bootstrap overview endpoint consumed by the web shell
 - Shared dashboard document package in `packages/dashboard-schema`
 - Development Docker Compose stack in `deploy/compose`
@@ -73,6 +74,7 @@ docker compose -f deploy/compose/docker-compose.dev.yml up --build
 ### Running surfaces
 
 - Web shell: `http://localhost:5173`
+- Identity bootstrap API: `http://localhost:8000/api/v1/identity/bootstrap`
 - Live overview API: `http://localhost:8000/api/v1/overview`
 - System metadata API: `http://localhost:8000/api/v1/system`
 - OpenAPI docs: `http://localhost:8000/docs`
@@ -98,9 +100,10 @@ docker compose -f deploy/compose/docker-compose.dev.yml config
 
 ## Next implementation targets
 
-1. Implement the identity, approval, and permission skeleton.
-2. Add persistent metadata models and Alembic migrations.
-3. Introduce dataset manifest loading and QuerySpec execution for Linkmerce PostgreSQL marts.
-4. Implement dashboard CRUD and versioned document persistence.
+1. Add persistent metadata models and Alembic migrations.
+2. Introduce dataset manifest loading and QuerySpec execution for Linkmerce PostgreSQL marts.
+3. Implement dashboard CRUD and versioned document persistence.
+4. Add the authenticated application shell and API client structure.
 5. Add first-party table and scorecard panels.
 6. Add the governed AI tool registry and harness pack loading.
+7. Add `ruff`-based static checks for backend import, typing, and module conventions.
