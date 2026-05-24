@@ -26,6 +26,7 @@
 | `DELETE` | `/api/v1/dashboards/{slug}` | dashboard와 저장된 모든 version 삭제. |
 | `GET` | `/api/v1/query/bootstrap` | starter dataset manifest registry와 governed-query rule set. |
 | `POST` | `/api/v1/query/validate` | QuerySpec semantic validation과 normalized execution preview. |
+| `POST` | `/api/v1/query/execute` | 검증된 QuerySpec을 현재 database connector에서 실제 실행. |
 | `GET` | `/api/v1/reference/apis` | 현재 구현된 API를 설명하는 structured human-readable reference. |
 
 ## Endpoint 상세
@@ -261,9 +262,29 @@
 - `detail.field`: 검증 실패가 발생한 payload 영역.
 - `detail.message`: 사람이 읽을 수 있는 실패 원인 설명.
 
+### `POST /api/v1/query/execute`
+
+입력 body 파라미터:
+
+- `datasetKey`: 대상 dataset manifest key.
+- `dimensions[]`: 선택적인 group-by dimension 목록.
+- `metrics[].key`: 선택할 metric key.
+- `metrics[].aggregate`: metric에 적용할 aggregate.
+- `filters[]`: `field`, `op`, `value`를 포함한 선택적 filter 목록.
+- `sort[]`: `field`, `direction`를 포함한 선택적 sort 목록.
+- `limit`: 선택적 row limit. 서버가 dataset limit policy 기준으로 보정한다.
+
+성공 응답 필드:
+
+- `results[]`: 실행 결과 row 객체 배열.
+- `columnNames[]`: 응답 순서 기준 결과 컬럼 이름 목록.
+- `rowCount`: 반환된 row 개수.
+- `executionMetadata.durationMs`: 실행 지연 시간(ms).
+- `executionMetadata.connector`: 실제 실행된 connector 종류.
+
 ## 참고
 
 - Swagger와 ReDoc은 생성된 OpenAPI schema를 가장 빠르게 살펴보는 도구다.
 - structured reference endpoint는 web shell이 그대로 사용하므로 앱 안 문서가 backend 계약과 같이 움직인다.
 - dashboard CRUD와 versioned document persistence는 이제 metadata schema 위에서 실제 endpoint로 동작한다.
-- query validation은 아직 semantic validation과 execution preview까지만 제공하며, connector-backed SQL execution은 다음 단계다.
+- query execution은 이제 `POST /api/v1/query/execute`를 통해 동작하며, 현재 `POSTGRES` connector 경로를 사용한다.

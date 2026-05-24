@@ -26,6 +26,7 @@ The canonical machine-readable version of this document is served by `GET /api/v
 | `DELETE` | `/api/v1/dashboards/{slug}` | Delete a dashboard and all stored versions. |
 | `GET` | `/api/v1/query/bootstrap` | Starter dataset manifest registry and governed-query rules. |
 | `POST` | `/api/v1/query/validate` | QuerySpec semantic validation and normalized execution preview. |
+| `POST` | `/api/v1/query/execute` | Execute a validated QuerySpec against the active database connector. |
 | `GET` | `/api/v1/reference/apis` | Structured human-readable documentation for the implemented APIs. |
 
 ## Endpoint details
@@ -261,9 +262,29 @@ Validation error response fields:
 - `detail.field`: payload area that failed validation.
 - `detail.message`: human-readable validation failure message.
 
+### `POST /api/v1/query/execute`
+
+Input body parameters:
+
+- `datasetKey`: target dataset manifest key.
+- `dimensions[]`: optional grouping dimensions.
+- `metrics[].key`: metric key to select.
+- `metrics[].aggregate`: aggregate applied to the metric.
+- `filters[]`: optional filters with `field`, `op`, and `value`.
+- `sort[]`: optional sort entries with `field` and `direction`.
+- `limit`: optional row limit. The server normalizes this using the dataset limit policy.
+
+Success response fields:
+
+- `results[]`: executed query rows as objects.
+- `columnNames[]`: result column names in response order.
+- `rowCount`: returned row count.
+- `executionMetadata.durationMs`: execution latency in milliseconds.
+- `executionMetadata.connector`: executed connector kind.
+
 ## Notes
 
 - Swagger and ReDoc remain the fastest way to explore the generated OpenAPI schema.
 - The structured reference endpoint is the source used by the web shell, so the in-app documentation stays aligned with the backend contract.
 - Dashboard CRUD and versioned document persistence are now live on top of the metadata schema.
-- Query validation still stops at semantic validation and execution preview generation; connector-backed SQL execution is the next backend step.
+- Query execution is now live through `POST /api/v1/query/execute` with the current `POSTGRES` connector path.

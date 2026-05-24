@@ -12,12 +12,13 @@ This is not merely a convenience restriction. It is one of the core security and
 
 ## Bootstrap status
 
-The current backend bootstrap already exposes the first governed query surfaces.
+The current backend bootstrap already exposes the governed query surfaces.
 
 - `GET /api/v1/query/bootstrap` returns the in-memory starter dataset manifest registry.
 - `POST /api/v1/query/validate` validates a `QuerySpec` payload against the manifest contract and returns a normalized execution preview.
+- `POST /api/v1/query/execute` validates, translates, and executes the request through the current `POSTGRES` connector path.
 
-This phase validates the contract only. Connector-backed execution against Linkmerce PostgreSQL marts is the next backend step.
+The current execution path is database-oriented and connector-gated. Additional connectors beyond `POSTGRES` remain future expansion work.
 
 ## 2. Why FLooks does not expose raw SQL by default
 
@@ -113,7 +114,7 @@ The execution order is:
 6. the request is converted into a connector-specific execution plan
 7. the result is returned within the cache and audit boundary
 
-The current bootstrap stops after semantic validation and execution preview generation. It does not execute connector SQL yet.
+The current bootstrap includes semantic validation plus connector-backed execution. Validation and execution now share the same manifest-governed contract.
 
 ## 6. Why this model matters for FLooks
 
@@ -127,7 +128,7 @@ The AI assistant must be able to explain datasets and propose strategies, but it
 
 ### 6.3 Connector extensibility
 
-V1 supports Linkmerce PostgreSQL marts first, but BigQuery, ClickHouse, JDBC, and CSV connectors may follow. QuerySpec allows the backend translator to change without changing how the frontend or AI requests data.
+V1 supports a `POSTGRES` connector path first, while BigQuery, ClickHouse, JDBC, and CSV connectors may follow. QuerySpec allows the backend translator to change without changing how the frontend or AI requests data.
 
 ### 6.4 Audit and cache coherence
 

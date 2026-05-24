@@ -83,6 +83,7 @@ docker compose -f deploy/compose/docker-compose.dev.yml up --build
 - Dashboard CRUD API: `http://localhost:8000/api/v1/dashboards`
 - Query bootstrap API: `http://localhost:8000/api/v1/query/bootstrap`
 - Query validation operation: `http://localhost:8000/docs#/query/validate_query_validate_post`
+- Query execution API: `http://localhost:8000/api/v1/query/execute`
 - Live overview API: `http://localhost:8000/api/v1/overview`
 - System metadata API: `http://localhost:8000/api/v1/system`
 - OpenAPI docs: `http://localhost:8000/docs`
@@ -110,8 +111,7 @@ docker compose -f deploy/compose/docker-compose.dev.yml config
 
 ## Next implementation targets
 
-1. Connect the governed query bootstrap to connector-backed execution for Linkmerce PostgreSQL marts.
-2. Add the authenticated application shell and API client structure.
-3. Add first-party table and scorecard panels.
-4. Add the governed AI tool registry and harness pack loading.
-5. Add `ruff`-based static checks for backend import, typing, and module conventions.
+1. Add the authenticated application shell and API client structure.
+2. Add first-party table and scorecard panels.
+3. Add the governed AI tool registry and harness pack loading.
+4. Add `ruff`-based static checks for backend import, typing, and module conventions.
