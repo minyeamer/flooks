@@ -58,8 +58,8 @@ async def get_overview() -> OverviewResponse:
         headline="Bootstrap slice is live",
         summary=(
             "The web shell now has a live API surface for roadmap, readiness, service links, "
-            "and human-readable API reference data while the identity, metadata, and governed-query "
-            "layers are added."
+            "human-readable API reference data, and dashboard CRUD/versioning while the identity, "
+            "metadata, and governed-query layers are added."
         ),
         metrics=[
             OverviewMetric(
@@ -89,8 +89,8 @@ async def get_overview() -> OverviewResponse:
             ),
             OverviewMetric(
                 label="Live endpoints",
-                value="9",
-                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, overview, API reference, and OpenAPI docs are now runnable surfaces.",
+                value="14",
+                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, dashboard list/create/detail/update/delete, overview, API reference, and OpenAPI docs are now runnable surfaces.",
             ),
         ],
         execution_plan=[
@@ -121,8 +121,14 @@ async def get_overview() -> OverviewResponse:
             DeliveryStep(
                 id="dashboard-crud",
                 title="Dashboard CRUD and persistence",
+                status="done",
+                outcome="Dashboard create, list, read, version creation, and delete routes now persist versioned dashboard documents on top of the metadata schema.",
+            ),
+            DeliveryStep(
+                id="connector-query-execution",
+                title="Connector-backed query execution",
                 status="in_progress",
-                outcome="The next runtime slice is storing and versioning dashboard documents on top of the new metadata schema.",
+                outcome="The next runtime slice is turning validated QuerySpec requests into connector executions against the first database-backed marts.",
             ),
         ],
         service_links=[
@@ -145,6 +151,11 @@ async def get_overview() -> OverviewResponse:
                 label="Metadata Bootstrap",
                 href=f"{api_prefix}/metadata/bootstrap",
                 description="Persistence baseline for SQLAlchemy models and the first Alembic revision.",
+            ),
+            ServiceLink(
+                label="Dashboards",
+                href=f"{api_prefix}/dashboards",
+                description="Dashboard CRUD collection endpoint for versioned dashboard documents.",
             ),
             ServiceLink(
                 label="Query Bootstrap",

@@ -23,6 +23,50 @@ router = APIRouter(tags=["reference"])
 )
 async def get_api_reference() -> ApiReferenceResponse:
     api_prefix = settings.api_v1_prefix
+    dashboard_document_example = {
+        "id": "db-home",
+        "key": "commerce-home",
+        "title": "Commerce Executive Overview",
+        "version": 1,
+        "ownerRoleBoundary": "ADMIN",
+        "supportedDataSources": ["LINKMERCE_POSTGRES"],
+        "pages": [
+            {
+                "id": "page-overview",
+                "title": "Overview",
+                "width": 1600,
+                "height": 900,
+                "snapGrid": {"columnWidth": 20, "rowHeight": 20},
+                "placements": [
+                    {
+                        "panelId": "panel-gmv",
+                        "x": 40,
+                        "y": 40,
+                        "width": 300,
+                        "height": 180,
+                        "zIndex": 1,
+                    }
+                ],
+            }
+        ],
+        "panelLibrary": [
+            {
+                "id": "panel-gmv",
+                "key": "gmv-scorecard",
+                "kind": "scorecard",
+                "title": "GMV",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+            }
+        ],
+    }
+    dashboard_version_fields = [
+        ApiFieldReference(name="versions[].versionNumber", type="integer", description="저장된 dashboard document revision 번호입니다."),
+        ApiFieldReference(name="versions[].status", type="string", description="revision 상태입니다.", enum_values=["draft", "published", "archived"]),
+        ApiFieldReference(name="versions[].summary", type="string | null", description="revision 요약 문장입니다.", required=False),
+        ApiFieldReference(name="versions[].createdBy", type="string", description="revision 생성자입니다."),
+        ApiFieldReference(name="versions[].createdAt", type="string", description="revision 생성 시각입니다."),
+    ]
 
     return ApiReferenceResponse(
         title="FLooks Bootstrap API Reference",
@@ -183,6 +227,162 @@ async def get_api_reference() -> ApiReferenceResponse:
                     ),
                 ],
                 openapi_href="/docs#/metadata/get_metadata_bootstrap_api_v1_metadata_bootstrap_get",
+            ),
+            ApiEndpointReference(
+                id="dashboards-list",
+                method="GET",
+                path=f"{api_prefix}/dashboards",
+                summary="List dashboards",
+                description="저장된 dashboard metadata와 최신 revision 상태를 요약해서 반환합니다.",
+                parameters=[],
+                responses=[
+                    ApiResponseReference(
+                        status_code=200,
+                        description="dashboard summary 배열을 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="[].id", type="string", description="dashboard 레코드 UUID입니다."),
+                            ApiFieldReference(name="[].slug", type="string", description="dashboard 식별 slug입니다."),
+                            ApiFieldReference(name="[].title", type="string", description="현재 dashboard 제목입니다."),
+                            ApiFieldReference(name="[].description", type="string | null", description="dashboard 설명입니다.", required=False),
+                            ApiFieldReference(name="[].ownerPrincipalKind", type="string", description="owner principal kind입니다."),
+                            ApiFieldReference(name="[].ownerPrincipalKey", type="string", description="owner principal key입니다."),
+                            ApiFieldReference(name="[].latestVersionNumber", type="integer", description="가장 최신 revision 번호입니다."),
+                            ApiFieldReference(name="[].latestVersionStatus", type="string", description="최신 revision 상태입니다.", enum_values=["draft", "published", "archived"]),
+                            ApiFieldReference(name="[].createdAt", type="string", description="dashboard 생성 시각입니다."),
+                            ApiFieldReference(name="[].updatedAt", type="string", description="dashboard 최신 수정 시각입니다."),
+                        ],
+                    ),
+                ],
+                openapi_href="/docs#/dashboards/list_dashboards_api_v1_dashboards_get",
+            ),
+            ApiEndpointReference(
+                id="dashboards-create",
+                method="POST",
+                path=f"{api_prefix}/dashboards",
+                summary="Create dashboard",
+                description="새 dashboard metadata와 첫 document revision을 함께 생성합니다.",
+                parameters=[
+                    ApiFieldReference(name="slug", type="string", description="dashboard 식별 slug입니다.", example="commerce-home"),
+                    ApiFieldReference(name="description", type="string | null", description="dashboard 설명입니다.", required=False, example="Primary executive dashboard."),
+                    ApiFieldReference(name="ownerPrincipalKind", type="string", description="dashboard owner principal kind입니다.", example="user", enum_values=["user", "team", "department", "role", "workspace"]),
+                    ApiFieldReference(name="ownerPrincipalKey", type="string", description="dashboard owner principal key입니다.", example="owner-1"),
+                    ApiFieldReference(name="createdBy", type="string", description="첫 revision 생성자입니다.", example="owner-1"),
+                    ApiFieldReference(name="summary", type="string | null", description="첫 revision 요약입니다.", required=False, example="Initial bootstrap version."),
+                    ApiFieldReference(name="status", type="string", description="첫 revision 상태입니다.", required=False, example="draft", enum_values=["draft", "published", "archived"]),
+                    ApiFieldReference(name="document", type="object", description="저장할 dashboard document입니다.", example=dashboard_document_example),
+                ],
+                responses=[
+                    ApiResponseReference(
+                        status_code=201,
+                        description="dashboard와 첫 revision이 생성되면 현재 document와 version history를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="id", type="string", description="dashboard 레코드 UUID입니다."),
+                            ApiFieldReference(name="slug", type="string", description="dashboard 식별 slug입니다."),
+                            ApiFieldReference(name="title", type="string", description="현재 dashboard 제목입니다."),
+                            ApiFieldReference(name="description", type="string | null", description="dashboard 설명입니다.", required=False),
+                            ApiFieldReference(name="ownerPrincipalKind", type="string", description="owner principal kind입니다."),
+                            ApiFieldReference(name="ownerPrincipalKey", type="string", description="owner principal key입니다."),
+                            ApiFieldReference(name="latestVersionNumber", type="integer", description="최신 revision 번호입니다."),
+                            ApiFieldReference(name="latestVersionStatus", type="string", description="최신 revision 상태입니다.", enum_values=["draft", "published", "archived"]),
+                            ApiFieldReference(name="document", type="object", description="현재 선택된 dashboard document입니다."),
+                            *dashboard_version_fields,
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=409,
+                        description="slug가 이미 존재하면 충돌을 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="충돌이 발생한 입력 필드입니다.", example="slug"),
+                            ApiFieldReference(name="detail.message", type="string", description="충돌 설명입니다."),
+                        ],
+                        example={
+                            "detail": {
+                                "field": "slug",
+                                "message": "Dashboard slug 'commerce-home' already exists.",
+                            }
+                        },
+                    ),
+                ],
+                openapi_href="/docs#/dashboards/create_dashboard_api_v1_dashboards_post",
+            ),
+            ApiEndpointReference(
+                id="dashboards-detail",
+                method="GET",
+                path=f"{api_prefix}/dashboards/{{slug}}",
+                summary="Get dashboard",
+                description="최신 dashboard document 또는 특정 version의 document를 version history와 함께 반환합니다.",
+                parameters=[
+                    ApiFieldReference(name="slug", type="path string", description="조회할 dashboard slug입니다.", example="commerce-home"),
+                    ApiFieldReference(name="version", type="query integer", description="선택적으로 조회할 revision 번호입니다. 생략하면 최신 revision을 반환합니다.", required=False, example=2),
+                ],
+                responses=[
+                    ApiResponseReference(
+                        status_code=200,
+                        description="dashboard detail과 version history를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="id", type="string", description="dashboard 레코드 UUID입니다."),
+                            ApiFieldReference(name="slug", type="string", description="dashboard 식별 slug입니다."),
+                            ApiFieldReference(name="title", type="string", description="dashboard 제목입니다."),
+                            ApiFieldReference(name="document", type="object", description="선택된 revision의 dashboard document입니다."),
+                            *dashboard_version_fields,
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=404,
+                        description="dashboard 또는 version이 없으면 not found를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패 영역입니다."),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 설명입니다."),
+                        ],
+                    ),
+                ],
+                openapi_href="/docs#/dashboards/get_dashboard_api_v1_dashboards__slug__get",
+            ),
+            ApiEndpointReference(
+                id="dashboards-update",
+                method="PUT",
+                path=f"{api_prefix}/dashboards/{{slug}}",
+                summary="Create dashboard version",
+                description="기존 dashboard에 새 document revision을 추가하고, latest version pointer를 갱신합니다.",
+                parameters=[
+                    ApiFieldReference(name="slug", type="path string", description="revision을 추가할 dashboard slug입니다.", example="commerce-home"),
+                    ApiFieldReference(name="createdBy", type="string", description="새 revision 생성자입니다.", example="owner-2"),
+                    ApiFieldReference(name="summary", type="string | null", description="새 revision 요약입니다.", required=False, example="Add scorecard page layout."),
+                    ApiFieldReference(name="status", type="string", description="새 revision 상태입니다.", required=False, example="published", enum_values=["draft", "published", "archived"]),
+                    ApiFieldReference(name="description", type="string | null", description="dashboard 설명을 함께 갱신하려면 전달합니다.", required=False, example="Published executive dashboard."),
+                    ApiFieldReference(name="document", type="object", description="저장할 다음 dashboard document입니다.", example=dashboard_document_example),
+                ],
+                responses=[
+                    ApiResponseReference(
+                        status_code=200,
+                        description="새 revision이 추가된 뒤 최신 dashboard detail을 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="latestVersionNumber", type="integer", description="갱신된 최신 revision 번호입니다."),
+                            ApiFieldReference(name="latestVersionStatus", type="string", description="갱신된 최신 revision 상태입니다.", enum_values=["draft", "published", "archived"]),
+                            ApiFieldReference(name="document", type="object", description="새로 저장된 최신 dashboard document입니다."),
+                            *dashboard_version_fields,
+                        ],
+                    ),
+                ],
+                openapi_href="/docs#/dashboards/update_dashboard_api_v1_dashboards__slug__put",
+            ),
+            ApiEndpointReference(
+                id="dashboards-delete",
+                method="DELETE",
+                path=f"{api_prefix}/dashboards/{{slug}}",
+                summary="Delete dashboard",
+                description="dashboard metadata와 연결된 모든 revision을 삭제합니다.",
+                parameters=[
+                    ApiFieldReference(name="slug", type="path string", description="삭제할 dashboard slug입니다.", example="commerce-home"),
+                ],
+                responses=[
+                    ApiResponseReference(
+                        status_code=204,
+                        description="dashboard가 삭제되면 응답 본문 없이 종료합니다.",
+                        fields=[],
+                    ),
+                ],
+                openapi_href="/docs#/dashboards/delete_dashboard_api_v1_dashboards__slug__delete",
             ),
             ApiEndpointReference(
                 id="query-bootstrap",

@@ -32,7 +32,7 @@ class ApiResponseReference(BaseModel):
 
 class ApiEndpointReference(BaseModel):
     id: str
-    method: Literal["GET", "POST"]
+    method: Literal["GET", "POST", "PUT", "DELETE"]
     path: str
     summary: str
     description: str

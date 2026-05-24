@@ -19,6 +19,11 @@
 | `GET` | `/api/v1/overview` | 웹 셸이 읽는 현재 런타임 overview payload. |
 | `GET` | `/api/v1/identity/bootstrap` | identity, approval, permission baseline 계약. |
 | `GET` | `/api/v1/metadata/bootstrap` | metadata persistence baseline과 Alembic revision 정보. |
+| `GET` | `/api/v1/dashboards` | dashboard metadata와 최신 revision 상태 목록. |
+| `POST` | `/api/v1/dashboards` | dashboard와 첫 document revision 생성. |
+| `GET` | `/api/v1/dashboards/{slug}` | 최신 또는 지정 version의 dashboard document 조회. |
+| `PUT` | `/api/v1/dashboards/{slug}` | 새 dashboard document revision 생성. |
+| `DELETE` | `/api/v1/dashboards/{slug}` | dashboard와 저장된 모든 version 삭제. |
 | `GET` | `/api/v1/query/bootstrap` | starter dataset manifest registry와 governed-query rule set. |
 | `POST` | `/api/v1/query/validate` | QuerySpec semantic validation과 normalized execution preview. |
 | `GET` | `/api/v1/reference/apis` | 현재 구현된 API를 설명하는 structured human-readable reference. |
@@ -103,6 +108,98 @@
 - `expected_revision`: API가 기대하는 Alembic revision.
 - `tables[]`: 각 항목이 `name`을 갖는 metadata table 목록.
 
+### `GET /api/v1/dashboards`
+
+입력 파라미터:
+
+- 없음
+
+응답 필드:
+
+- `[].id`: dashboard metadata UUID.
+- `[].slug`: dashboard slug.
+- `[].title`: 최신 dashboard 제목.
+- `[].description`: 있으면 dashboard 설명.
+- `[].ownerPrincipalKind`: owner principal kind.
+- `[].ownerPrincipalKey`: owner principal key.
+- `[].latestVersionNumber`: 최신 document revision 번호.
+- `[].latestVersionStatus`: 최신 revision 상태.
+- `[].createdAt`: dashboard 생성 시각.
+- `[].updatedAt`: dashboard metadata 수정 시각.
+
+### `POST /api/v1/dashboards`
+
+입력 body 파라미터:
+
+- `slug`: dashboard slug.
+- `description`: 선택적인 dashboard 설명.
+- `ownerPrincipalKind`: owner principal kind.
+- `ownerPrincipalKey`: owner principal key.
+- `createdBy`: 첫 revision 생성자.
+- `summary`: 선택적인 첫 revision 요약.
+- `status`: 선택적인 첫 revision 상태. 기본값은 `draft`.
+- `document`: dashboard document payload. backend가 저장 시점에 `key`와 `version`을 정규화한다.
+
+성공 응답 필드:
+
+- `id`: dashboard metadata UUID.
+- `slug`: dashboard slug.
+- `title`: 현재 dashboard 제목.
+- `description`: 저장된 dashboard 설명.
+- `ownerPrincipalKind`: owner principal kind.
+- `ownerPrincipalKey`: owner principal key.
+- `latestVersionNumber`: 최신 revision 번호.
+- `latestVersionStatus`: 최신 revision 상태.
+- `document`: 현재 dashboard document.
+- `versions[]`: `versionNumber`, `status`, `summary`, `createdBy`, `createdAt`를 가진 revision history.
+
+충돌 응답 필드:
+
+- `detail.field`: 실패 필드. 현재는 `slug`.
+- `detail.message`: 사람이 읽을 수 있는 충돌 설명.
+
+### `GET /api/v1/dashboards/{slug}`
+
+입력 파라미터:
+
+- `slug`: path의 dashboard 식별자.
+- `version`: 선택적인 query parameter. 없으면 최신 revision을 반환한다.
+
+응답 필드:
+
+- `id`: dashboard metadata UUID.
+- `slug`: dashboard slug.
+- `title`: dashboard 제목.
+- `document`: 선택된 dashboard document revision.
+- `versions[]`: dashboard의 전체 version history.
+
+### `PUT /api/v1/dashboards/{slug}`
+
+입력 body 파라미터:
+
+- `createdBy`: 새 revision 생성자.
+- `summary`: 선택적인 revision 요약.
+- `status`: 선택적인 revision 상태.
+- `description`: 선택적인 dashboard 설명 갱신 값.
+- `document`: 다음 dashboard document payload.
+
+성공 응답 필드:
+
+- `latestVersionNumber`: 갱신된 revision 번호.
+- `latestVersionStatus`: 갱신된 revision 상태.
+- `document`: 새로 저장된 최신 dashboard document.
+- `versions[]`: 새 version을 포함한 전체 revision history.
+
+### `DELETE /api/v1/dashboards/{slug}`
+
+입력 파라미터:
+
+- `slug`: path의 dashboard 식별자.
+
+응답 필드:
+
+- 없음. 삭제가 성공하면 HTTP `204 No Content`를 반환한다.
+
 ### `GET /api/v1/query/bootstrap`
 
 입력 파라미터:
@@ -168,4 +265,5 @@
 
 - Swagger와 ReDoc은 생성된 OpenAPI schema를 가장 빠르게 살펴보는 도구다.
 - structured reference endpoint는 web shell이 그대로 사용하므로 앱 안 문서가 backend 계약과 같이 움직인다.
+- dashboard CRUD와 versioned document persistence는 이제 metadata schema 위에서 실제 endpoint로 동작한다.
 - query validation은 아직 semantic validation과 execution preview까지만 제공하며, connector-backed SQL execution은 다음 단계다.

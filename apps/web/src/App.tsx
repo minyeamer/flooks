@@ -68,7 +68,7 @@ type ApiResponseReference = {
 
 type ApiEndpointReference = {
   id: string;
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
   summary: string;
   description: string;
@@ -138,7 +138,16 @@ function getServiceUrl(href: string): string {
 }
 
 function getMethodClassName(method: ApiEndpointReference['method']): string {
-  return method === 'POST' ? 'methodBadge methodBadgePost' : 'methodBadge methodBadgeGet';
+  switch (method) {
+    case 'POST':
+      return 'methodBadge methodBadgePost';
+    case 'PUT':
+      return 'methodBadge methodBadgePut';
+    case 'DELETE':
+      return 'methodBadge methodBadgeDelete';
+    default:
+      return 'methodBadge methodBadgeGet';
+  }
 }
 
 function formatJsonValue(value: unknown): string {
