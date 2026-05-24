@@ -18,6 +18,7 @@ The primary architecture and stack rationale lives in [docs/architecture/platfor
 - Vite + React frontend shell in `apps/web`
 - FastAPI backend skeleton in `apps/api`
 - Identity and permissions bootstrap endpoint in `apps/api`
+- Metadata persistence bootstrap endpoint and Alembic baseline in `apps/api`
 - Live bootstrap overview endpoint consumed by the web shell
 - Shared dashboard document package in `packages/dashboard-schema`
 - Development Docker Compose stack in `deploy/compose`
@@ -61,6 +62,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -e apps/api[dev]
+python3 -m alembic -c apps/api/alembic.ini upgrade head
 uvicorn app.main:app --app-dir apps/api --reload
 ```
 
@@ -75,6 +77,7 @@ docker compose -f deploy/compose/docker-compose.dev.yml up --build
 
 - Web shell: `http://localhost:5173`
 - Identity bootstrap API: `http://localhost:8000/api/v1/identity/bootstrap`
+- Metadata bootstrap API: `http://localhost:8000/api/v1/metadata/bootstrap`
 - Live overview API: `http://localhost:8000/api/v1/overview`
 - System metadata API: `http://localhost:8000/api/v1/system`
 - OpenAPI docs: `http://localhost:8000/docs`
@@ -85,6 +88,7 @@ docker compose -f deploy/compose/docker-compose.dev.yml up --build
 npm run build:web
 PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py
 python3 -m compileall apps/api/app apps/api/tests
+FLOOKS_DATABASE_URL=postgresql+psycopg://flooks:flooks@localhost:5432/flooks_meta python3 -m alembic -c apps/api/alembic.ini upgrade head
 docker compose -f deploy/compose/docker-compose.dev.yml config
 ```
 
@@ -100,10 +104,9 @@ docker compose -f deploy/compose/docker-compose.dev.yml config
 
 ## Next implementation targets
 
-1. Add persistent metadata models and Alembic migrations.
-2. Introduce dataset manifest loading and QuerySpec execution for Linkmerce PostgreSQL marts.
-3. Implement dashboard CRUD and versioned document persistence.
-4. Add the authenticated application shell and API client structure.
-5. Add first-party table and scorecard panels.
-6. Add the governed AI tool registry and harness pack loading.
-7. Add `ruff`-based static checks for backend import, typing, and module conventions.
+1. Introduce dataset manifest loading and QuerySpec execution for Linkmerce PostgreSQL marts.
+2. Implement dashboard CRUD and versioned document persistence on top of the new metadata tables.
+3. Add the authenticated application shell and API client structure.
+4. Add first-party table and scorecard panels.
+5. Add the governed AI tool registry and harness pack loading.
+6. Add `ruff`-based static checks for backend import, typing, and module conventions.

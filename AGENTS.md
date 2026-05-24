@@ -20,7 +20,7 @@ FLooks is an internal-first enterprise dashboard platform. Prioritize governed d
 5. AI-related changes must preserve server-side authorization before model invocation.
 6. In `apps/api`, prefer explicit type annotations for public functions, response models, and domain contracts.
 7. In `apps/api`, prefer absolute imports rooted at `app` instead of relative imports unless a technical constraint requires otherwise.
-8. Add an English module docstring when creating or substantially editing backend runtime modules.
+8. Add an English module docstring when creating or substantially editing backend runtime modules. Multi-line module docstrings are preferred when extra context helps.
 9. Keep two blank lines between top-level Python definitions, one blank line between methods, and a trailing newline at the end of each Python file.
 
 ## Validation rules
