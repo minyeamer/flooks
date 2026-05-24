@@ -39,11 +39,29 @@ def test_overview() -> None:
     assert payload["environment"] == "development"
     assert any(metric["label"] == "Metadata tables" and metric["value"] == "4" for metric in payload["metrics"])
     assert any(metric["label"] == "Governed datasets" and metric["value"] == "2" for metric in payload["metrics"])
-    assert any(metric["label"] == "Live endpoints" and metric["value"] == "8" for metric in payload["metrics"])
+    assert any(metric["label"] == "Live endpoints" and metric["value"] == "9" for metric in payload["metrics"])
     assert any(link["href"] == "/api/v1/overview" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/identity/bootstrap" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/metadata/bootstrap" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/query/bootstrap" for link in payload["service_links"])
+    assert any(link["href"] == "/api/v1/reference/apis" for link in payload["service_links"])
+
+
+def test_api_reference() -> None:
+    response = client.get("/api/v1/reference/apis")
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["title"] == "FLooks Bootstrap API Reference"
+    assert any(viewer["href"] == "/docs" for viewer in payload["viewers"])
+    assert any(endpoint["path"] == "/api/v1/query/validate" for endpoint in payload["endpoints"])
+
+    query_validate = next(endpoint for endpoint in payload["endpoints"] if endpoint["id"] == "query-validate")
+
+    assert query_validate["method"] == "POST"
+    assert any(parameter["name"] == "limit" for parameter in query_validate["parameters"])
+    assert any(response_item["status_code"] == 400 for response_item in query_validate["responses"])
 
 
 def test_identity_bootstrap() -> None:

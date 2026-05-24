@@ -57,8 +57,9 @@ async def get_overview() -> OverviewResponse:
         environment=settings.env,
         headline="Bootstrap slice is live",
         summary=(
-            "The web shell now has a live API surface for roadmap, readiness, and service links "
-            "while the identity, metadata, and governed-query layers are added."
+            "The web shell now has a live API surface for roadmap, readiness, service links, "
+            "and human-readable API reference data while the identity, metadata, and governed-query "
+            "layers are added."
         ),
         metrics=[
             OverviewMetric(
@@ -88,8 +89,8 @@ async def get_overview() -> OverviewResponse:
             ),
             OverviewMetric(
                 label="Live endpoints",
-                value="8",
-                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, overview, and OpenAPI docs are now runnable surfaces.",
+                value="9",
+                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, overview, API reference, and OpenAPI docs are now runnable surfaces.",
             ),
         ],
         execution_plan=[
@@ -154,6 +155,11 @@ async def get_overview() -> OverviewResponse:
                 label="Query Validate",
                 href="/docs#/query/validate_query_validate_post",
                 description="Submit a QuerySpec payload to validate it against the manifest registry.",
+            ),
+            ServiceLink(
+                label="API Reference",
+                href=f"{api_prefix}/reference/apis",
+                description="Structured endpoint documentation for parameters, response fields, and payload examples.",
             ),
             ServiceLink(
                 label="Overview",

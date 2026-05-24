@@ -60,3 +60,12 @@ FLooks는 Linkmerce 기반 분석 데이터를 안전하게 소비하고, 권한
 6. Phase 6: `feat(frontend)` 범위로 application shell을 확장하고, 라우팅, API client 구조, 인증 뒤 navigation surface를 만든다.
 7. Phase 7: `feat(frontend)` 범위로 dashboard runtime basics를 추가하고, live API 응답을 쓰는 first-party table 및 scorecard panel을 만든다.
 8. Phase 8: `chore(infra)` 범위로 delivery hardening을 진행하고, Compose health check, developer entrypoint, CI-ready validation 명령, `ruff` 기반 정적 체크를 정리한다.
+
+## Immediate references
+
+- stack rationale: [platform-dossier.md](./platform-dossier.md)
+- API 파라미터 및 응답 기준: [api-reference.md](./api-reference.md)
+- governed query contract: [query-spec.md](./query-spec.md)
+- core entities: [domain-model.md](./domain-model.md)
+- panel extension boundary: [panel-sdk.md](./panel-sdk.md)
+- AI extension boundary: [ai-harness.md](./ai-harness.md)

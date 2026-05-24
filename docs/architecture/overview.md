@@ -64,6 +64,7 @@ The next implementation wave should add the following immediately:
 ## Immediate references
 
 - stack rationale: [platform-dossier.md](./platform-dossier.md)
+- API parameters and response reference: [api-reference.md](./api-reference.md)
 - governed query contract: [query-spec.md](./query-spec.md)
 - core entities: [domain-model.md](./domain-model.md)
 - panel extension boundary: [panel-sdk.md](./panel-sdk.md)

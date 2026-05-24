@@ -100,6 +100,7 @@ docker compose -f deploy/compose/docker-compose.dev.yml config
 - `docs/architecture/platform-dossier.md`
 - `docs/adr/0001-platform-baseline.md`
 - `docs/architecture/overview.md`
+- `docs/architecture/api-reference.md`
 - `docs/architecture/domain-model.md`
 - `docs/architecture/query-spec.md`
 - `docs/architecture/panel-sdk.md`

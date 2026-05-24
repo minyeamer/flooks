@@ -50,6 +50,46 @@ type SystemResponse = {
   modules: string[];
 };
 
+type ApiFieldReference = {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+  example: unknown;
+  enum_values: string[];
+};
+
+type ApiResponseReference = {
+  status_code: number;
+  description: string;
+  fields: ApiFieldReference[];
+  example: unknown;
+};
+
+type ApiEndpointReference = {
+  id: string;
+  method: 'GET' | 'POST';
+  path: string;
+  summary: string;
+  description: string;
+  parameters: ApiFieldReference[];
+  responses: ApiResponseReference[];
+  openapi_href: string;
+};
+
+type ApiReferenceViewer = {
+  label: string;
+  href: string;
+  description: string;
+};
+
+type ApiReferenceResponse = {
+  title: string;
+  summary: string;
+  viewers: ApiReferenceViewer[];
+  endpoints: ApiEndpointReference[];
+};
+
 type RequestState = 'loading' | 'ready' | 'error';
 
 const launchTracks = [
@@ -63,7 +103,7 @@ const launchTracks = [
   },
   {
     title: 'Governed Query Path',
-    body: 'Dataset manifest와 QuerySpec executor를 추가해 패널과 AI가 같은 데이터 계약 위에서 동작하도록 고정합니다.',
+    body: 'Dataset manifest와 QuerySpec validation이 이제 live contract로 올라왔고, 현재 web shell에서 API reference까지 바로 확인할 수 있습니다.',
   },
 ];
 
@@ -97,9 +137,26 @@ function getServiceUrl(href: string): string {
   return new URL(href, API_ORIGIN).toString();
 }
 
+function getMethodClassName(method: ApiEndpointReference['method']): string {
+  return method === 'POST' ? 'methodBadge methodBadgePost' : 'methodBadge methodBadgeGet';
+}
+
+function formatJsonValue(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return JSON.stringify(value, null, 2);
+}
+
 function App() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [system, setSystem] = useState<SystemResponse | null>(null);
+  const [apiReference, setApiReference] = useState<ApiReferenceResponse | null>(null);
   const [requestState, setRequestState] = useState<RequestState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -111,18 +168,20 @@ function App() {
         setRequestState('loading');
         setErrorMessage(null);
 
-        const [overviewResponse, systemResponse] = await Promise.all([
+        const [overviewResponse, systemResponse, referenceResponse] = await Promise.all([
           fetch(`${API_BASE_URL}/overview`, { signal: controller.signal }),
           fetch(`${API_BASE_URL}/system`, { signal: controller.signal }),
+          fetch(`${API_BASE_URL}/reference/apis`, { signal: controller.signal }),
         ]);
 
-        if (!overviewResponse.ok || !systemResponse.ok) {
+        if (!overviewResponse.ok || !systemResponse.ok || !referenceResponse.ok) {
           throw new Error('Live bootstrap API is not responding yet.');
         }
 
-        const [overviewPayload, systemPayload] = await Promise.all([
+        const [overviewPayload, systemPayload, referencePayload] = await Promise.all([
           overviewResponse.json() as Promise<OverviewResponse>,
           systemResponse.json() as Promise<SystemResponse>,
+          referenceResponse.json() as Promise<ApiReferenceResponse>,
         ]);
 
         if (controller.signal.aborted) {
@@ -131,6 +190,7 @@ function App() {
 
         setOverview(overviewPayload);
         setSystem(systemPayload);
+        setApiReference(referencePayload);
         setRequestState('ready');
       } catch (error) {
         if (controller.signal.aborted) {
@@ -302,6 +362,133 @@ function App() {
             </div>
           ) : (
             <p className="callout">OpenAPI, health, and live overview links appear here after the API responds.</p>
+          )}
+        </section>
+
+        <section className="panel panelWide">
+          <div className="panelHeader">
+            <span className="chip">API Reference</span>
+            <h2>{apiReference?.title ?? 'Bootstrap API reference'}</h2>
+            <p className="sectionSummary">
+              {apiReference?.summary ?? 'The API reference panel will appear once the structured reference endpoint responds.'}
+            </p>
+          </div>
+          {apiReference ? (
+            <div className="referenceLayout">
+              <div className="referenceViewerList">
+                {apiReference.viewers.map((viewer) => (
+                  <a
+                    className="referenceViewer"
+                    href={getServiceUrl(viewer.href)}
+                    key={viewer.label}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <strong>{viewer.label}</strong>
+                    <span className="linkUrl">{getServiceUrl(viewer.href)}</span>
+                    <p>{viewer.description}</p>
+                  </a>
+                ))}
+              </div>
+
+              <div className="referenceList">
+                {apiReference.endpoints.map((endpoint) => (
+                  <details className="referenceCard" key={endpoint.id} open={endpoint.id === 'query-validate'}>
+                    <summary className="referenceSummary">
+                      <div className="referenceHeadline">
+                        <span className={getMethodClassName(endpoint.method)}>{endpoint.method}</span>
+                        <div>
+                          <h3>{endpoint.summary}</h3>
+                          <p className="referencePath">{endpoint.path}</p>
+                        </div>
+                      </div>
+                      <a
+                        className="referenceOpenApi"
+                        href={getServiceUrl(endpoint.openapi_href)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                        }}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        OpenAPI
+                      </a>
+                    </summary>
+
+                    <div className="referenceBody">
+                      <p className="referenceDescription">{endpoint.description}</p>
+
+                      <div className="referenceSection">
+                        <h4>Input parameters</h4>
+                        {endpoint.parameters.length > 0 ? (
+                          <div className="referenceFieldList">
+                            {endpoint.parameters.map((parameter) => (
+                              <article className="referenceField" key={`${endpoint.id}-${parameter.name}`}>
+                                <div className="referenceFieldHeader">
+                                  <strong>{parameter.name}</strong>
+                                  <span>{parameter.type}</span>
+                                  <span>{parameter.required ? 'Required' : 'Optional'}</span>
+                                </div>
+                                <p>{parameter.description}</p>
+                                {parameter.enum_values.length > 0 ? (
+                                  <p className="referenceMeta">Allowed: {parameter.enum_values.join(', ')}</p>
+                                ) : null}
+                                {parameter.example != null ? (
+                                  <pre className="referenceCode">{formatJsonValue(parameter.example)}</pre>
+                                ) : null}
+                              </article>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="callout">This endpoint does not require input parameters.</p>
+                        )}
+                      </div>
+
+                      <div className="referenceSection">
+                        <h4>Responses</h4>
+                        <div className="referenceResponseList">
+                          {endpoint.responses.map((responseItem) => (
+                            <article className="referenceResponse" key={`${endpoint.id}-${responseItem.status_code}`}>
+                              <div className="referenceResponseHeader">
+                                <span className="responseBadge">HTTP {responseItem.status_code}</span>
+                                <p>{responseItem.description}</p>
+                              </div>
+                              <div className="referenceFieldList compactFields">
+                                {responseItem.fields.map((field) => (
+                                  <article className="referenceField" key={`${endpoint.id}-${responseItem.status_code}-${field.name}`}>
+                                    <div className="referenceFieldHeader">
+                                      <strong>{field.name}</strong>
+                                      <span>{field.type}</span>
+                                      <span>{field.required ? 'Required' : 'Optional'}</span>
+                                    </div>
+                                    <p>{field.description}</p>
+                                    {field.enum_values.length > 0 ? (
+                                      <p className="referenceMeta">Allowed: {field.enum_values.join(', ')}</p>
+                                    ) : null}
+                                    {field.example != null ? (
+                                      <pre className="referenceCode">{formatJsonValue(field.example)}</pre>
+                                    ) : null}
+                                  </article>
+                                ))}
+                              </div>
+                              {responseItem.example != null ? (
+                                <pre className="referenceCode referenceCodeBlock">{formatJsonValue(responseItem.example)}</pre>
+                              ) : null}
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className={`callout ${requestState === 'error' ? 'calloutError' : ''}`}>
+              {requestState === 'error'
+                ? 'The structured API reference is not reachable yet.'
+                : `Loading API reference data from ${API_BASE_URL}/reference/apis`}
+            </p>
           )}
         </section>
 
