@@ -10,6 +10,15 @@ Panels and AI tools in FLooks do not execute arbitrary SQL directly. They submit
 
 This is not merely a convenience restriction. It is one of the core security and operating principles of the platform.
 
+## Bootstrap status
+
+The current backend bootstrap already exposes the first governed query surfaces.
+
+- `GET /api/v1/query/bootstrap` returns the in-memory starter dataset manifest registry.
+- `POST /api/v1/query/validate` validates a `QuerySpec` payload against the manifest contract and returns a normalized execution preview.
+
+This phase validates the contract only. Connector-backed execution against Linkmerce PostgreSQL marts is the next backend step.
+
 ## 2. Why FLooks does not expose raw SQL by default
 
 If an enterprise dashboard platform opens raw SQL as a default surface, several problems emerge quickly.
@@ -103,6 +112,8 @@ The execution order is:
 5. row limits, pagination, and timeout policy are normalized by the server
 6. the request is converted into a connector-specific execution plan
 7. the result is returned within the cache and audit boundary
+
+The current bootstrap stops after semantic validation and execution preview generation. It does not execute connector SQL yet.
 
 ## 6. Why this model matters for FLooks
 

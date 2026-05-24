@@ -19,6 +19,7 @@ The primary architecture and stack rationale lives in [docs/architecture/platfor
 - FastAPI backend skeleton in `apps/api`
 - Identity and permissions bootstrap endpoint in `apps/api`
 - Metadata persistence bootstrap endpoint and Alembic baseline in `apps/api`
+- Governed query bootstrap endpoints and QuerySpec validation in `apps/api`
 - Live bootstrap overview endpoint consumed by the web shell
 - Shared dashboard document package in `packages/dashboard-schema`
 - Development Docker Compose stack in `deploy/compose`
@@ -78,6 +79,8 @@ docker compose -f deploy/compose/docker-compose.dev.yml up --build
 - Web shell: `http://localhost:5173`
 - Identity bootstrap API: `http://localhost:8000/api/v1/identity/bootstrap`
 - Metadata bootstrap API: `http://localhost:8000/api/v1/metadata/bootstrap`
+- Query bootstrap API: `http://localhost:8000/api/v1/query/bootstrap`
+- Query validation operation: `http://localhost:8000/docs#/query/validate_query_validate_post`
 - Live overview API: `http://localhost:8000/api/v1/overview`
 - System metadata API: `http://localhost:8000/api/v1/system`
 - OpenAPI docs: `http://localhost:8000/docs`
@@ -86,7 +89,7 @@ docker compose -f deploy/compose/docker-compose.dev.yml up --build
 
 ```bash
 npm run build:web
-PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py
+PYTHONPATH=apps/api python3 -m pytest apps/api/tests
 python3 -m compileall apps/api/app apps/api/tests
 FLOOKS_DATABASE_URL=postgresql+psycopg://flooks:flooks@localhost:5432/flooks_meta python3 -m alembic -c apps/api/alembic.ini upgrade head
 docker compose -f deploy/compose/docker-compose.dev.yml config
@@ -104,8 +107,8 @@ docker compose -f deploy/compose/docker-compose.dev.yml config
 
 ## Next implementation targets
 
-1. Introduce dataset manifest loading and QuerySpec execution for Linkmerce PostgreSQL marts.
-2. Implement dashboard CRUD and versioned document persistence on top of the new metadata tables.
+1. Implement dashboard CRUD and versioned document persistence on top of the new metadata tables.
+2. Connect the governed query bootstrap to connector-backed execution for Linkmerce PostgreSQL marts.
 3. Add the authenticated application shell and API client structure.
 4. Add first-party table and scorecard panels.
 5. Add the governed AI tool registry and harness pack loading.

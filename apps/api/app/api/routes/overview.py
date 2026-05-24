@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.domain.enums import DataSourceKind, ModuleKey, SystemRole
+from app.query.registry import list_dataset_manifests
 
 router = APIRouter(tags=["overview"])
 
@@ -49,6 +50,7 @@ class OverviewResponse(BaseModel):
 )
 async def get_overview() -> OverviewResponse:
     api_prefix = settings.api_v1_prefix
+    dataset_count = len(list_dataset_manifests())
 
     return OverviewResponse(
         product="FLooks",
@@ -80,9 +82,14 @@ async def get_overview() -> OverviewResponse:
                 note="Dashboards, versions, ACL entries, and dataset grants now have relational storage models.",
             ),
             OverviewMetric(
+                label="Governed datasets",
+                value=str(dataset_count),
+                note="Starter dataset manifests now define the allowed fields, metrics, and limits for QuerySpec validation.",
+            ),
+            OverviewMetric(
                 label="Live endpoints",
-                value="6",
-                note="Health, system, identity bootstrap, metadata bootstrap, overview, and OpenAPI docs are now runnable surfaces.",
+                value="8",
+                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, overview, and OpenAPI docs are now runnable surfaces.",
             ),
         ],
         execution_plan=[
@@ -107,8 +114,14 @@ async def get_overview() -> OverviewResponse:
             DeliveryStep(
                 id="governed-query",
                 title="Governed query execution",
+                status="done",
+                outcome="Dataset manifests and QuerySpec validation now define the governed query contract before connector execution is added.",
+            ),
+            DeliveryStep(
+                id="dashboard-crud",
+                title="Dashboard CRUD and persistence",
                 status="in_progress",
-                outcome="Dataset manifests and QuerySpec execution are now the next runtime slice for panels and AI tools.",
+                outcome="The next runtime slice is storing and versioning dashboard documents on top of the new metadata schema.",
             ),
         ],
         service_links=[
@@ -131,6 +144,16 @@ async def get_overview() -> OverviewResponse:
                 label="Metadata Bootstrap",
                 href=f"{api_prefix}/metadata/bootstrap",
                 description="Persistence baseline for SQLAlchemy models and the first Alembic revision.",
+            ),
+            ServiceLink(
+                label="Query Bootstrap",
+                href=f"{api_prefix}/query/bootstrap",
+                description="Starter dataset manifest registry for the governed query contract.",
+            ),
+            ServiceLink(
+                label="Query Validate",
+                href="/docs#/query/validate_query_validate_post",
+                description="Submit a QuerySpec payload to validate it against the manifest registry.",
             ),
             ServiceLink(
                 label="Overview",
