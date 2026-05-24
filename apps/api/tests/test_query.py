@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import StaticPool
 
 from app.api.routes import query as query_routes
 from app.domain.enums import DataSourceKind
@@ -23,6 +25,7 @@ from app.domain.query import (
     QueryValidationResponse,
 )
 from app.main import app
+from app.query import connector as query_connector
 from app.query.connector import execute_query_via_connector
 from app.query.exceptions import UnsupportedQueryConnectorError
 from app.query.translator import translate_query_spec
@@ -30,12 +33,15 @@ from app.query.translator import translate_query_spec
 client = TestClient(app)
 
 
-def build_test_manifest(source_kind: DataSourceKind) -> DatasetManifest:
+def build_test_manifest(
+    source_kind: DataSourceKind,
+    relation: str = "analytics.warehouse_orders",
+) -> DatasetManifest:
     return DatasetManifest(
         key="warehouse_orders",
         label="Warehouse Orders",
         description="Test manifest for connector dispatch.",
-        source=DatasetSource(kind=source_kind, relation="analytics.warehouse_orders"),
+        source=DatasetSource(kind=source_kind, relation=relation),
         dimensions=[],
         metrics=[
             DatasetMetric(
@@ -136,6 +142,56 @@ def test_execute_query_via_connector_rejects_unsupported_connector() -> None:
 
     with pytest.raises(UnsupportedQueryConnectorError, match="CLICKHOUSE"):
         execute_query_via_connector(manifest, "SELECT 1", {})
+
+
+def test_query_execute_returns_rows_for_supported_connector(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    manifest = build_test_manifest(DataSourceKind.POSTGRES, relation="warehouse_orders")
+    query_spec = build_test_spec(manifest.key)
+    validation = QueryValidationResponse(
+        valid=True,
+        manifest=manifest,
+        normalized_spec=query_spec,
+        execution_plan=ExecutionPlanPreview(
+            dataset_key=manifest.key,
+            connector_kind=manifest.source.kind,
+            relation=manifest.source.relation,
+            enforced_limit=query_spec.limit or 100,
+            default_filter_count=len(manifest.default_filters),
+            selected_dimension_count=len(query_spec.dimensions),
+            selected_metric_count=len(query_spec.metrics),
+        ),
+    )
+
+    with engine.begin() as connection:
+        connection.execute(text('CREATE TABLE warehouse_orders (revenue INTEGER NOT NULL)'))
+        connection.execute(text('INSERT INTO warehouse_orders (revenue) VALUES (100), (25)'))
+
+    def fake_validate_query_spec(_: QuerySpec) -> QueryValidationResponse:
+        return validation
+
+    monkeypatch.setattr(query_routes, "validate_query_spec", fake_validate_query_spec)
+    monkeypatch.setattr(query_connector, "get_engine", lambda: engine)
+
+    try:
+        response = client.post(
+            "/api/v1/query/execute",
+            json=query_spec.model_dump(by_alias=True, exclude_none=True),
+        )
+    finally:
+        engine.dispose()
+
+    assert response.status_code == 200
+    assert response.json()["results"] == [{"revenue": 125}]
+    assert response.json()["columnNames"] == ["revenue"]
+    assert response.json()["rowCount"] == 1
+    assert response.json()["executionMetadata"]["connector"] == "POSTGRES"
 
 
 def test_query_execute_returns_not_implemented_for_unsupported_connector(

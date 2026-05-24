@@ -373,6 +373,109 @@ h1 {
   gap: 16px;
 }
 
+.runtimeLayout,
+.runtimeStats {
+  display: grid;
+  gap: 16px;
+}
+
+.runtimeStats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.runtimeStat,
+.runtimeTableCard {
+  border-radius: 18px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.runtimeStat {
+  padding: 18px;
+}
+
+.runtimeStat span {
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.runtimeStat strong {
+  display: block;
+  margin: 12px 0 10px;
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.runtimeStat p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.runtimeTableCard {
+  padding: 18px;
+}
+
+.runtimeTableHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.queryBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(24, 34, 45, 0.08);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.queryTableWrap {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+}
+
+.queryTable {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+}
+
+.queryTable th,
+.queryTable td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid rgba(24, 34, 45, 0.08);
+}
+
+.queryTable th {
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.queryTable td {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.queryTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .documentPreview div {
   padding: 16px;
   border-radius: 18px;
@@ -555,6 +658,7 @@ h1 {
   .cards,
   .documentPreview,
   .metricGrid,
+  .runtimeStats,
   .stepList,
   .referenceLayout,
   .compactFields {

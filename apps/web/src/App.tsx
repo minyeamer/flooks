@@ -90,7 +90,31 @@ type ApiReferenceResponse = {
   endpoints: ApiEndpointReference[];
 };
 
+type QueryResultValue = string | number | boolean;
+
+type QueryExecutionRow = Record<string, QueryResultValue>;
+
+type QueryExecutionResponse = {
+  results: QueryExecutionRow[];
+  columnNames: string[];
+  rowCount: number;
+  executionMetadata: {
+    connector?: string;
+    durationMs?: number;
+  };
+};
+
 type RequestState = 'loading' | 'ready' | 'error';
+
+const numberFormatter = new Intl.NumberFormat('en-US');
+
+const liveQueryPanelRequest = {
+  datasetKey: 'mart_commerce_daily',
+  dimensions: ['channel_name'],
+  metrics: [{ key: 'revenue', aggregate: 'sum' }],
+  sort: [{ field: 'revenue', direction: 'desc' }],
+  limit: 5,
+} as const;
 
 const launchTracks = [
   {
@@ -162,12 +186,47 @@ function formatJsonValue(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+function formatQueryCellValue(value: QueryResultValue | undefined): string {
+  if (typeof value === 'number') {
+    return numberFormatter.format(value);
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+
+  return value ?? '';
+}
+
+async function getResponseMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = (await response.json()) as {
+      detail?: { message?: string } | string;
+    };
+
+    if (typeof payload.detail === 'string' && payload.detail.length > 0) {
+      return payload.detail;
+    }
+
+    if (typeof payload.detail === 'object' && payload.detail?.message) {
+      return payload.detail.message;
+    }
+  } catch {
+    return fallback;
+  }
+
+  return fallback;
+}
+
 function App() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [apiReference, setApiReference] = useState<ApiReferenceResponse | null>(null);
+  const [liveQuery, setLiveQuery] = useState<QueryExecutionResponse | null>(null);
   const [requestState, setRequestState] = useState<RequestState>('loading');
+  const [liveQueryState, setLiveQueryState] = useState<RequestState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [liveQueryErrorMessage, setLiveQueryErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -220,6 +279,61 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadLiveQueryPanel() {
+      try {
+        setLiveQueryState('loading');
+        setLiveQueryErrorMessage(null);
+
+        const response = await fetch(`${API_BASE_URL}/query/execute`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(liveQueryPanelRequest),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            await getResponseMessage(
+              response,
+              'The live query panel is waiting for analytics data and connector access.',
+            ),
+          );
+        }
+
+        const payload = (await response.json()) as QueryExecutionResponse;
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setLiveQuery(payload);
+        setLiveQueryState('ready');
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setLiveQueryState('error');
+        setLiveQueryErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Unable to execute the live query panel preview.',
+        );
+      }
+    }
+
+    void loadLiveQueryPanel();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
   const liveRoles = system?.roles ?? systemRoles;
   const liveDataSources = system?.dataSources ?? dataSourceKinds;
   const liveModules = system?.modules ?? [];
@@ -227,6 +341,8 @@ function App() {
   const heroSummary =
     overview?.summary ??
     'V1은 Linkmerce mart 기반 사내 대시보드 플랫폼으로 시작하고, 이후 다양한 데이터 소스와 커스텀 패널 SDK를 열어가는 구조로 설계합니다.';
+  const liveQueryResults = liveQuery?.results ?? [];
+  const liveQueryColumns = liveQuery?.columnNames ?? [];
 
   return (
     <div className="shell">
@@ -497,6 +613,82 @@ function App() {
               {requestState === 'error'
                 ? 'The structured API reference is not reachable yet.'
                 : `Loading API reference data from ${API_BASE_URL}/reference/apis`}
+            </p>
+          )}
+        </section>
+
+        <section className="panel panelWide">
+          <div className="panelHeader">
+            <span className="chip">Live Panel Runtime</span>
+            <h2>Governed revenue panel preview</h2>
+            <p className="sectionSummary">
+              The web shell now sends a fixed QuerySpec to the live query execution API and renders the
+              first scorecard-plus-table runtime slice from the response.
+            </p>
+          </div>
+          {liveQuery && liveQueryState === 'ready' ? (
+            <div className="runtimeLayout">
+              <div className="runtimeStats">
+                <article className="runtimeStat">
+                  <span>Returned Rows</span>
+                  <strong>{liveQuery.rowCount}</strong>
+                  <p>Top channel groups returned by the sample governed query.</p>
+                </article>
+                <article className="runtimeStat">
+                  <span>Connector</span>
+                  <strong>{liveQuery.executionMetadata.connector ?? 'Unknown'}</strong>
+                  <p>The current panel runtime stays inside the same connector-gated execution path.</p>
+                </article>
+                <article className="runtimeStat">
+                  <span>Duration</span>
+                  <strong>
+                    {liveQuery.executionMetadata.durationMs != null
+                      ? `${liveQuery.executionMetadata.durationMs} ms`
+                      : 'Pending'}
+                  </strong>
+                  <p>Execution timing returned directly by the backend response metadata.</p>
+                </article>
+              </div>
+
+              <div className="runtimeTableCard">
+                <div className="runtimeTableHeader">
+                  <span className="kicker">POST /query/execute</span>
+                  <span className="queryBadge">mart_commerce_daily · revenue by channel</span>
+                </div>
+
+                {liveQueryResults.length > 0 ? (
+                  <div className="queryTableWrap">
+                    <table className="queryTable">
+                      <thead>
+                        <tr>
+                          {liveQueryColumns.map((column) => (
+                            <th key={column} scope="col">
+                              {column}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {liveQueryResults.map((row, index) => (
+                          <tr key={`row-${index}`}>
+                            {liveQueryColumns.map((column) => (
+                              <td key={`${index}-${column}`}>{formatQueryCellValue(row[column])}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="callout">The sample QuerySpec executed successfully, but the dataset returned no rows.</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className={`callout ${liveQueryState === 'error' ? 'calloutError' : ''}`}>
+              {liveQueryState === 'error'
+                ? liveQueryErrorMessage ?? 'The live query panel could not be rendered yet.'
+                : `Executing a governed sample query against ${API_BASE_URL}/query/execute`}
             </p>
           )}
         </section>
