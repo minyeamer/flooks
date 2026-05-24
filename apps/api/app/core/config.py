@@ -10,10 +10,19 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Runtime configuration for the FLooks API service.
+
+    The service currently supports local development defaults and Docker Compose
+    overrides. Metadata persistence uses `database_url`, which can point to the
+    local host during direct execution or to the `postgres` service inside the
+    container network.
+    """
+
     app_name: str = "FLooks API"
     env: str = "development"
     api_v1_prefix: str = "/api/v1"
     allowed_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
+    database_url: str = "postgresql+psycopg://flooks:flooks@localhost:5432/flooks_meta"
 
     model_config = SettingsConfigDict(
         env_prefix="FLOOKS_",
@@ -27,6 +36,14 @@ class Settings(BaseSettings):
         if not value.startswith("/"):
             raise ValueError("api_v1_prefix must start with '/'")
         return value.rstrip("/") or "/"
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, value: str) -> str:
+        normalized_value = value.strip()
+        if not normalized_value:
+            raise ValueError("database_url must not be empty")
+        return normalized_value
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

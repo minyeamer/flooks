@@ -75,9 +75,14 @@ async def get_overview() -> OverviewResponse:
                 note="Auth, dashboards, catalog, discussions, and AI stay separated.",
             ),
             OverviewMetric(
+                label="Metadata tables",
+                value="4",
+                note="Dashboards, versions, ACL entries, and dataset grants now have relational storage models.",
+            ),
+            OverviewMetric(
                 label="Live endpoints",
-                value="5",
-                note="Health, system, identity bootstrap, overview, and OpenAPI docs are now runnable surfaces.",
+                value="6",
+                note="Health, system, identity bootstrap, metadata bootstrap, overview, and OpenAPI docs are now runnable surfaces.",
             ),
         ],
         execution_plan=[
@@ -96,14 +101,14 @@ async def get_overview() -> OverviewResponse:
             DeliveryStep(
                 id="metadata-persistence",
                 title="Metadata persistence",
-                status="in_progress",
-                outcome="SQLAlchemy models and Alembic migrations are the next runtime slice for dashboards and access rules.",
+                status="done",
+                outcome="SQLAlchemy models and an Alembic baseline now define the first dashboard and access-control tables.",
             ),
             DeliveryStep(
                 id="governed-query",
                 title="Governed query execution",
-                status="next",
-                outcome="Dataset manifests and QuerySpec execution will power panels and AI tools.",
+                status="in_progress",
+                outcome="Dataset manifests and QuerySpec execution are now the next runtime slice for panels and AI tools.",
             ),
         ],
         service_links=[
@@ -121,6 +126,11 @@ async def get_overview() -> OverviewResponse:
                 label="Identity Bootstrap",
                 href=f"{api_prefix}/identity/bootstrap",
                 description="Identity, approval, and permission policy baseline for future auth flows.",
+            ),
+            ServiceLink(
+                label="Metadata Bootstrap",
+                href=f"{api_prefix}/metadata/bootstrap",
+                description="Persistence baseline for SQLAlchemy models and the first Alembic revision.",
             ),
             ServiceLink(
                 label="Overview",

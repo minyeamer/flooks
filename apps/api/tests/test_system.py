@@ -37,9 +37,11 @@ def test_overview() -> None:
 
     assert payload["product"] == "FLooks"
     assert payload["environment"] == "development"
-    assert any(metric["label"] == "Live endpoints" and metric["value"] == "5" for metric in payload["metrics"])
+    assert any(metric["label"] == "Metadata tables" and metric["value"] == "4" for metric in payload["metrics"])
+    assert any(metric["label"] == "Live endpoints" and metric["value"] == "6" for metric in payload["metrics"])
     assert any(link["href"] == "/api/v1/overview" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/identity/bootstrap" for link in payload["service_links"])
+    assert any(link["href"] == "/api/v1/metadata/bootstrap" for link in payload["service_links"])
 
 
 def test_identity_bootstrap() -> None:
@@ -60,6 +62,23 @@ def test_identity_bootstrap() -> None:
     ]
 
 
+def test_metadata_bootstrap() -> None:
+    response = client.get("/api/v1/metadata/bootstrap")
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["dialect"] == "postgresql"
+    assert payload["driver"] == "psycopg"
+    assert payload["expected_revision"] == "20260524_0001"
+    assert [table["name"] for table in payload["tables"]] == [
+        "dashboard",
+        "dashboard_version",
+        "dataset_grant",
+        "resource_acl_entry",
+    ]
+
+
 def test_settings_accept_comma_separated_allowed_origins() -> None:
     settings = Settings(
         _env_file=None,
@@ -67,3 +86,9 @@ def test_settings_accept_comma_separated_allowed_origins() -> None:
     )
 
     assert settings.allowed_origins == ["http://localhost:5173", "http://127.0.0.1:4173"]
+
+
+def test_settings_accept_database_url() -> None:
+    settings = Settings(_env_file=None, database_url=" postgresql+psycopg://flooks:flooks@localhost:5432/flooks_meta ")
+
+    assert settings.database_url == "postgresql+psycopg://flooks:flooks@localhost:5432/flooks_meta"
