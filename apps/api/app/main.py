@@ -1,9 +1,18 @@
+"""Application entrypoint for the FLooks FastAPI service."""
+
+from __future__ import annotations
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-from . import __version__
-from .api.router import api_router
-from .core.config import settings
+from app import __version__
+from app.api.router import api_router
+from app.core.config import settings
+
+
+class LivenessResponse(BaseModel):
+    status: str
 
 app = FastAPI(
     title=settings.app_name,
@@ -23,6 +32,6 @@ app.add_middleware(
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 
-@app.get("/livez", summary="Liveness probe")
-async def livez() -> dict[str, str]:
-    return {"status": "alive"}
+@app.get("/livez", response_model=LivenessResponse, summary="Liveness probe")
+async def livez() -> LivenessResponse:
+    return LivenessResponse(status="alive")

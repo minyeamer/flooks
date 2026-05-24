@@ -1,3 +1,7 @@
+"""Tests for the FLooks bootstrap API routes."""
+
+from __future__ import annotations
+
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
@@ -33,8 +37,27 @@ def test_overview() -> None:
 
     assert payload["product"] == "FLooks"
     assert payload["environment"] == "development"
-    assert any(metric["label"] == "System roles" and metric["value"] == "4" for metric in payload["metrics"])
+    assert any(metric["label"] == "Live endpoints" and metric["value"] == "5" for metric in payload["metrics"])
     assert any(link["href"] == "/api/v1/overview" for link in payload["service_links"])
+    assert any(link["href"] == "/api/v1/identity/bootstrap" for link in payload["service_links"])
+
+
+def test_identity_bootstrap() -> None:
+    response = client.get("/api/v1/identity/bootstrap")
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["identity"]["email_verification_required"] is True
+    assert payload["identity"]["admin_approval_required"] is True
+    assert payload["identity"]["default_role"] == "VIEWER"
+    assert payload["permissions"]["dataset_grant_axes"] == [
+        "user",
+        "team",
+        "department",
+        "role",
+        "workspace",
+    ]
 
 
 def test_settings_accept_comma_separated_allowed_origins() -> None:

@@ -1,3 +1,7 @@
+"""Shared domain enumerations for the FLooks API."""
+
+from __future__ import annotations
+
 from enum import StrEnum
 
 

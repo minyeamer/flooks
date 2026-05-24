@@ -1,10 +1,14 @@
+"""Overview routes that describe the current FLooks bootstrap state."""
+
+from __future__ import annotations
+
 from typing import Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ...core.config import settings
-from ...domain.enums import DataSourceKind, ModuleKey, SystemRole
+from app.core.config import settings
+from app.domain.enums import DataSourceKind, ModuleKey, SystemRole
 
 router = APIRouter(tags=["overview"])
 
@@ -72,8 +76,8 @@ async def get_overview() -> OverviewResponse:
             ),
             OverviewMetric(
                 label="Live endpoints",
-                value="4",
-                note="Health, system, overview, and OpenAPI docs are now runnable surfaces.",
+                value="5",
+                note="Health, system, identity bootstrap, overview, and OpenAPI docs are now runnable surfaces.",
             ),
         ],
         execution_plan=[
@@ -86,14 +90,14 @@ async def get_overview() -> OverviewResponse:
             DeliveryStep(
                 id="identity-and-permissions",
                 title="Identity and permissions skeleton",
-                status="in_progress",
-                outcome="Email auth, approval flow, and dataset grants are the next runtime slice.",
+                status="done",
+                outcome="Bootstrap policy routes now expose email auth, approval stages, and permission evaluation rules.",
             ),
             DeliveryStep(
                 id="metadata-persistence",
                 title="Metadata persistence",
-                status="next",
-                outcome="SQLAlchemy models and Alembic migrations will persist dashboards and access rules.",
+                status="in_progress",
+                outcome="SQLAlchemy models and Alembic migrations are the next runtime slice for dashboards and access rules.",
             ),
             DeliveryStep(
                 id="governed-query",
@@ -112,6 +116,11 @@ async def get_overview() -> OverviewResponse:
                 label="System",
                 href=f"{api_prefix}/system",
                 description="Static bootstrap metadata used by clients and docs.",
+            ),
+            ServiceLink(
+                label="Identity Bootstrap",
+                href=f"{api_prefix}/identity/bootstrap",
+                description="Identity, approval, and permission policy baseline for future auth flows.",
             ),
             ServiceLink(
                 label="Overview",

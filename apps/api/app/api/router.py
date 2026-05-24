@@ -1,8 +1,13 @@
+"""API router composition for the FLooks FastAPI service."""
+
+from __future__ import annotations
+
 from fastapi import APIRouter
 
-from .routes import health, overview, system
+from app.api.routes import health, identity, overview, system
 
 api_router = APIRouter()
 api_router.include_router(health.router)
+api_router.include_router(identity.router)
 api_router.include_router(overview.router)
 api_router.include_router(system.router)

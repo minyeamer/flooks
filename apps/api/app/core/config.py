@@ -1,3 +1,7 @@
+"""Configuration models and settings loaders for the FLooks API."""
+
+from __future__ import annotations
+
 from functools import lru_cache
 from typing import Annotated, Any
 
