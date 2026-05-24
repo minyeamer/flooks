@@ -39,12 +39,13 @@ def test_overview() -> None:
     assert payload["environment"] == "development"
     assert any(metric["label"] == "Metadata tables" and metric["value"] == "4" for metric in payload["metrics"])
     assert any(metric["label"] == "Governed datasets" and metric["value"] == "2" for metric in payload["metrics"])
-    assert any(metric["label"] == "Live endpoints" and metric["value"] == "14" for metric in payload["metrics"])
+    assert any(metric["label"] == "Live endpoints" and metric["value"] == "15" for metric in payload["metrics"])
     assert any(link["href"] == "/api/v1/overview" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/identity/bootstrap" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/metadata/bootstrap" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/dashboards" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/query/bootstrap" for link in payload["service_links"])
+    assert any(link["href"] == "/api/v1/query/execute" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/reference/apis" for link in payload["service_links"])
 
 

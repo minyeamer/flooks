@@ -1,9 +1,4 @@
-"""Governed query bootstrap routes for dataset manifests and QuerySpec validation.
-
-These routes expose the initial manifest registry and semantic validation layer.
-They do not execute SQL yet; they only describe and validate the contract that
-panels and AI tools will use in later phases.
-"""
+"""Governed query bootstrap routes for dataset manifests, validation, and execution."""
 
 from __future__ import annotations
 
@@ -16,7 +11,8 @@ from app.domain.query import (
     QuerySpec,
     QueryValidationResponse,
 )
-from app.query.connector import execute_postgres_query
+from app.query.connector import execute_query_via_connector
+from app.query.exceptions import UnsupportedQueryConnectorError
 from app.query.registry import list_dataset_manifests
 from app.query.translator import translate_query_spec
 from app.query.validator import QuerySpecValidationError, validate_query_spec
@@ -63,7 +59,6 @@ async def validate_query(query_spec: QuerySpec) -> QueryValidationResponse:
     summary="Execute a QuerySpec request",
 )
 async def execute_query(query_spec: QuerySpec) -> QueryExecutionResponse:
-    # 1. Validate and normalize the query spec
     try:
         validation = validate_query_spec(query_spec)
     except QuerySpecValidationError as error:
@@ -72,11 +67,14 @@ async def execute_query(query_spec: QuerySpec) -> QueryExecutionResponse:
             detail={"field": error.field, "message": error.message},
         ) from error
 
-    # 2. Translate to SQL
-    sql, params = translate_query_spec(validation.manifest, validation.normalized_spec)
-
-    # 3. TODO: Check dataset grants for the current user
-
-    # 4. Execute the query
-    # In this phase, we only support POSTGRES (formerly LINKMERCE_POSTGRES)
-    return execute_postgres_query(sql, params)
+    try:
+        sql, params = translate_query_spec(validation.manifest, validation.normalized_spec)
+        return execute_query_via_connector(validation.manifest, sql, params)
+    except UnsupportedQueryConnectorError as error:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={
+                "field": "datasetKey",
+                "message": str(error),
+            },
+        ) from error

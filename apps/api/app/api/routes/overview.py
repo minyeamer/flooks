@@ -58,8 +58,8 @@ async def get_overview() -> OverviewResponse:
         headline="Bootstrap slice is live",
         summary=(
             "The web shell now has a live API surface for roadmap, readiness, service links, "
-            "human-readable API reference data, and dashboard CRUD/versioning while the identity, "
-            "metadata, and governed-query layers are added."
+            "human-readable API reference data, dashboard CRUD/versioning, and governed query "
+            "validation/execution while the identity and metadata layers stay live."
         ),
         metrics=[
             OverviewMetric(
@@ -70,7 +70,7 @@ async def get_overview() -> OverviewResponse:
             OverviewMetric(
                 label="Data sources",
                 value=str(len(DataSourceKind)),
-                note="Linkmerce PostgreSQL remains the first governed connector path.",
+                note="POSTGRES is the first governed connector path exposed by the current bootstrap.",
             ),
             OverviewMetric(
                 label="Platform modules",
@@ -85,12 +85,12 @@ async def get_overview() -> OverviewResponse:
             OverviewMetric(
                 label="Governed datasets",
                 value=str(dataset_count),
-                note="Starter dataset manifests now define the allowed fields, metrics, and limits for QuerySpec validation.",
+                note="Starter dataset manifests now define the allowed fields, metrics, and limits for QuerySpec validation and execution.",
             ),
             OverviewMetric(
                 label="Live endpoints",
-                value="14",
-                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, dashboard list/create/detail/update/delete, overview, API reference, and OpenAPI docs are now runnable surfaces.",
+                value="15",
+                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, query execution, dashboard list/create/detail/update/delete, overview, API reference, and OpenAPI docs are now runnable surfaces.",
             ),
         ],
         execution_plan=[
@@ -116,7 +116,7 @@ async def get_overview() -> OverviewResponse:
                 id="governed-query",
                 title="Governed query execution",
                 status="done",
-                outcome="Dataset manifests and QuerySpec validation now define the governed query contract before connector execution is added.",
+                outcome="Dataset manifests and QuerySpec validation now define the governed query contract shared by validation and execution routes.",
             ),
             DeliveryStep(
                 id="dashboard-crud",
@@ -172,6 +172,11 @@ async def get_overview() -> OverviewResponse:
                 label="Query Validate",
                 href="/docs#/query/validate_query_validate_post",
                 description="Submit a QuerySpec payload to validate it against the manifest registry.",
+            ),
+            ServiceLink(
+                label="Query Execute",
+                href=f"{api_prefix}/query/execute",
+                description="Execute a validated QuerySpec through the current POSTGRES connector path.",
             ),
             ServiceLink(
                 label="API Reference",

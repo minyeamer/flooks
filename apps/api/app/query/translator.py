@@ -12,7 +12,9 @@ from typing import Any
 from sqlalchemy import ColumnElement, Table, and_, desc, select, text
 from sqlalchemy.sql import Select
 
-from app.domain.query import DatasetManifest, QuerySpec, FilterOperator, SortDirection
+from app.domain.enums import DataSourceKind
+from app.domain.query import DatasetManifest, FilterOperator, QuerySpec, SortDirection
+from app.query.exceptions import UnsupportedQueryConnectorError
 
 
 def translate_query_spec(manifest: DatasetManifest, spec: QuerySpec) -> tuple[str, dict[str, Any]]:
@@ -21,6 +23,9 @@ def translate_query_spec(manifest: DatasetManifest, spec: QuerySpec) -> tuple[st
     This first implementation uses a simple SQL builder logic. Future versions
     will use SQLAlchemy's full expression language with proper reflection.
     """
+
+    if manifest.source.kind != DataSourceKind.POSTGRES:
+        raise UnsupportedQueryConnectorError(manifest.source.kind)
 
     table_name = manifest.source.relation
     

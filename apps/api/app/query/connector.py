@@ -1,8 +1,4 @@
-"""Postgres connector for executing governed queries against analytics marts.
-
-The connector is responsible for executing the translated SQL against the
-target database and packaging the results into a standard QueryExecutionResponse.
-"""
+"""Connector dispatch for executing governed queries against analytics marts."""
 
 from __future__ import annotations
 
@@ -10,10 +6,24 @@ import time
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from app.domain.query import QueryExecutionResponse
+from app.domain.enums import DataSourceKind
+from app.domain.query import DatasetManifest, QueryExecutionResponse
 from app.db.session import get_engine
+from app.query.exceptions import UnsupportedQueryConnectorError
+
+
+def execute_query_via_connector(
+    manifest: DatasetManifest,
+    sql: str,
+    params: dict[str, Any],
+) -> QueryExecutionResponse:
+    """Dispatch a translated query to the supported connector implementation."""
+
+    if manifest.source.kind == DataSourceKind.POSTGRES:
+        return execute_postgres_query(sql, params)
+
+    raise UnsupportedQueryConnectorError(manifest.source.kind)
 
 
 def execute_postgres_query(sql: str, params: dict[str, Any]) -> QueryExecutionResponse:
