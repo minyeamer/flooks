@@ -981,3 +981,21 @@ Validation:
 - `curl -i -s http://localhost:8000/api/v1/dashboards | head -n 40`
 - `curl -i -s http://localhost:8000/api/v1/dashboards/commerce-home | head -n 60`
 - `npm run build:web`
+
+## 9f65661f · Create dashboard revisions
+
+Intent: turn dashboard version browsing into a real operator workflow by letting the web shell persist a new latest revision from the currently loaded dashboard document.
+
+What changed:
+- `apps/web/src/App.tsx` now keeps a small revision-composer draft for `createdBy`, `status`, `summary`, and optional description override alongside the selected dashboard state.
+- `apps/web/src/App.tsx` added a `Create revision` action that sends the currently loaded `dashboardDocument` to `PUT /api/v1/dashboards/{slug}`, so the shell can persist a new latest version from either the current latest revision or a historical revision being inspected.
+- `apps/web/src/App.tsx` resets the revision composer from the loaded dashboard payload and refreshes the dashboard directory after a successful save so the live shell immediately reflects the advanced version pointer.
+- `apps/web/src/styles.css` added a dedicated composer card and field styling that matches the existing dashboard-directory and runtime-shell interaction patterns.
+
+Functional result:
+- Operators can now create a new persisted dashboard revision directly from the live shell instead of only browsing the existing version history.
+- Historical version browsing now supports a concrete follow-up action: load an older revision, then persist it forward as the next latest revision.
+- The homepage moves one step closer to a usable dashboard service by exposing an existing backend versioning capability as an operator-facing control.
+
+Validation:
+- `npm run build:web`
