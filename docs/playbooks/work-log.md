@@ -838,3 +838,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 2f03b398 · Summarize starter history state
+
+Intent: make the starter history triage state readable at a glance by surfacing the active history view and currently open raw-error count directly in the summary row.
+
+What changed:
+- `apps/web/src/App.tsx` now derives the active starter history item count for the current filter and the number of currently open raw-error disclosures inside that visible slice.
+- `apps/web/src/App.tsx` renders compact summary badges that show the active filter view, visible item count, and open raw-error count when any raw errors are expanded.
+- `apps/web/src/styles.css` added compact summary-state badge styling plus an alert variant for the open raw-error indicator.
+
+Functional result:
+- Operators can now tell which starter history slice they are looking at without scanning the filter pills alone.
+- The summary row also shows when raw error disclosures are already open, which makes failure triage state visible before reading individual entries.
+- The starter history toolbar now communicates both navigation state and error-investigation state in one place.
+
+Validation:
+- `npm run build:web`
