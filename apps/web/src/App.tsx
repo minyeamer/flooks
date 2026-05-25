@@ -1507,6 +1507,10 @@ function App() {
     starterRefreshHistoryFilter,
   );
   const activeStarterRefreshHistoryCount = visibleStarterRefreshHistory.length;
+  const latestVisibleStarterRefreshHistoryTimestampLabel =
+    visibleStarterRefreshHistory[0]?.timestampLabel ?? null;
+  const latestFailedStarterRefreshHistoryTimestampLabel =
+    starterRefreshHistory.find((entry) => entry.actionKind === 'failed')?.timestampLabel ?? null;
   const openVisibleStarterRefreshHistoryErrorsCount = visibleStarterRefreshHistory.filter(
     (entry) => entry.rawDetail != null && openStarterRefreshHistoryErrors.includes(entry.id),
   ).length;
@@ -1872,6 +1876,16 @@ function App() {
                             {activeStarterRefreshHistoryCount} item
                             {activeStarterRefreshHistoryCount === 1 ? '' : 's'}
                           </span>
+                          {latestVisibleStarterRefreshHistoryTimestampLabel ? (
+                            <span className="runtimeStarterHistorySummaryBadge">
+                              Latest {latestVisibleStarterRefreshHistoryTimestampLabel}
+                            </span>
+                          ) : null}
+                          {latestFailedStarterRefreshHistoryTimestampLabel ? (
+                            <span className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert">
+                              Latest failure {latestFailedStarterRefreshHistoryTimestampLabel}
+                            </span>
+                          ) : null}
                           {openVisibleStarterRefreshHistoryErrorsCount > 0 ? (
                             <span className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert">
                               {openVisibleStarterRefreshHistoryErrorsCount} raw error
