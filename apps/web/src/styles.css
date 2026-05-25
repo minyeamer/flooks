@@ -559,6 +559,13 @@ h1 {
   gap: 2px;
 }
 
+.runtimeStarterHistorySummaryMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
 .runtimeStarterHistorySummary strong {
   font-size: 0.79rem;
   color: var(--ink);
@@ -568,6 +575,23 @@ h1 {
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.45;
+}
+
+.runtimeStarterHistorySummaryBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(24, 34, 45, 0.05);
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  color: var(--muted);
+  font-size: 0.71rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.runtimeStarterHistorySummaryBadgeAlert {
+  border-color: rgba(154, 52, 18, 0.16);
+  background: rgba(154, 52, 18, 0.06);
+  color: #9a3412;
 }
 
 .runtimeStarterHistoryFilters {

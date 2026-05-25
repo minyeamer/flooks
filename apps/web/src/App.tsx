@@ -1506,6 +1506,10 @@ function App() {
   const activeStarterRefreshHistoryFilterLabel = getStarterRefreshHistoryFilterLabel(
     starterRefreshHistoryFilter,
   );
+  const activeStarterRefreshHistoryCount = visibleStarterRefreshHistory.length;
+  const openVisibleStarterRefreshHistoryErrorsCount = visibleStarterRefreshHistory.filter(
+    (entry) => entry.rawDetail != null && openStarterRefreshHistoryErrors.includes(entry.id),
+  ).length;
   const formattedPersistedDashboardUpdatedAt =
     persistedDashboardUpdatedAt != null
       ? dateTimeFormatter.format(new Date(persistedDashboardUpdatedAt))
@@ -1860,6 +1864,21 @@ function App() {
                       <div className="runtimeStarterHistorySummaryText">
                         <strong>Recent starter actions</strong>
                         <span>Persists for this browser session</span>
+                        <div className="runtimeStarterHistorySummaryMeta" aria-label="Starter history view state">
+                          <span className="runtimeStarterHistorySummaryBadge">
+                            Viewing {activeStarterRefreshHistoryFilterLabel}
+                          </span>
+                          <span className="runtimeStarterHistorySummaryBadge">
+                            {activeStarterRefreshHistoryCount} item
+                            {activeStarterRefreshHistoryCount === 1 ? '' : 's'}
+                          </span>
+                          {openVisibleStarterRefreshHistoryErrorsCount > 0 ? (
+                            <span className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert">
+                              {openVisibleStarterRefreshHistoryErrorsCount} raw error
+                              {openVisibleStarterRefreshHistoryErrorsCount === 1 ? '' : 's'} open
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="runtimeStarterHistoryFilters" aria-label="Starter history filters">
                         {starterRefreshHistoryFilterOptions.map((filterOption) => (
