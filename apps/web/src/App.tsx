@@ -148,7 +148,7 @@ type StarterRefreshHistoryTone = 'success' | 'error';
 
 type StarterRefreshHistoryKind = 'created' | 'refreshed' | 'aligned' | 'failed';
 
-type StarterRefreshHistoryFilter = 'all' | 'failed';
+type StarterRefreshHistoryFilter = 'all' | StarterRefreshHistoryKind;
 
 type StarterRefreshHistoryEntry = {
   id: string;
@@ -265,6 +265,14 @@ function getStarterRefreshHistoryKindLabel(
     default:
       return null;
   }
+}
+
+function getStarterRefreshHistoryFilterLabel(filter: StarterRefreshHistoryFilter): string {
+  if (filter === 'all') {
+    return 'All';
+  }
+
+  return getStarterRefreshHistoryKindLabel(filter) ?? 'All';
 }
 
 function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
@@ -1200,8 +1208,8 @@ function App() {
 
   useEffect(() => {
     if (
-      starterRefreshHistoryFilter === 'failed' &&
-      starterRefreshHistory.every((entry) => entry.tone !== 'error')
+      starterRefreshHistoryFilter !== 'all' &&
+      starterRefreshHistory.every((entry) => entry.actionKind !== starterRefreshHistoryFilter)
     ) {
       setStarterRefreshHistoryFilter('all');
     }
@@ -1325,12 +1333,49 @@ function App() {
       : starterRefreshHistory.length > 0
       ? 'Clear recent starter actions saved for this browser session'
       : 'No recent starter actions saved for this browser session';
-  const failedStarterRefreshHistoryCount = starterRefreshHistory.filter(
-    (entry) => entry.tone === 'error',
-  ).length;
-  const visibleStarterRefreshHistory = starterRefreshHistoryFilter === 'failed'
-    ? starterRefreshHistory.filter((entry) => entry.tone === 'error')
-    : starterRefreshHistory;
+  const starterRefreshHistoryFilterCounts: Record<StarterRefreshHistoryKind, number> = {
+    created: starterRefreshHistory.filter((entry) => entry.actionKind === 'created').length,
+    refreshed: starterRefreshHistory.filter((entry) => entry.actionKind === 'refreshed').length,
+    aligned: starterRefreshHistory.filter((entry) => entry.actionKind === 'aligned').length,
+    failed: starterRefreshHistory.filter((entry) => entry.actionKind === 'failed').length,
+  };
+  const visibleStarterRefreshHistory =
+    starterRefreshHistoryFilter === 'all'
+      ? starterRefreshHistory
+      : starterRefreshHistory.filter((entry) => entry.actionKind === starterRefreshHistoryFilter);
+  const starterRefreshHistoryFilterOptions: Array<{
+    id: StarterRefreshHistoryFilter;
+    label: string;
+    count?: number;
+  }> = [
+    {
+      id: 'all',
+      label: 'All',
+    },
+    {
+      id: 'created',
+      label: 'Created',
+      count: starterRefreshHistoryFilterCounts.created,
+    },
+    {
+      id: 'refreshed',
+      label: 'Refreshed',
+      count: starterRefreshHistoryFilterCounts.refreshed,
+    },
+    {
+      id: 'aligned',
+      label: 'Aligned',
+      count: starterRefreshHistoryFilterCounts.aligned,
+    },
+    {
+      id: 'failed',
+      label: 'Failed',
+      count: starterRefreshHistoryFilterCounts.failed,
+    },
+  ];
+  const activeStarterRefreshHistoryFilterLabel = getStarterRefreshHistoryFilterLabel(
+    starterRefreshHistoryFilter,
+  );
   const formattedPersistedDashboardUpdatedAt =
     persistedDashboardUpdatedAt != null
       ? dateTimeFormatter.format(new Date(persistedDashboardUpdatedAt))
@@ -1687,30 +1732,34 @@ function App() {
                         <span>Persists for this browser session</span>
                       </div>
                       <div className="runtimeStarterHistoryFilters" aria-label="Starter history filters">
-                        <button
-                          type="button"
-                          className={`runtimeStarterHistoryFilterButton${starterRefreshHistoryFilter === 'all' ? ' runtimeStarterHistoryFilterButtonActive' : ''}`}
-                          onClick={() => setStarterRefreshHistoryFilter('all')}
-                        >
-                          All
-                        </button>
-                        <button
-                          type="button"
-                          className={`runtimeStarterHistoryFilterButton${starterRefreshHistoryFilter === 'failed' ? ' runtimeStarterHistoryFilterButtonActive' : ''}`}
-                          disabled={failedStarterRefreshHistoryCount === 0}
-                          onClick={() => setStarterRefreshHistoryFilter('failed')}
-                          aria-label={`Show failed starter actions (${failedStarterRefreshHistoryCount})`}
-                          title={
-                            failedStarterRefreshHistoryCount > 0
-                              ? `Show ${failedStarterRefreshHistoryCount} failed starter action${failedStarterRefreshHistoryCount === 1 ? '' : 's'}`
-                              : 'No failed starter actions in this browser session'
-                          }
-                        >
-                          <span>Failed</span>
-                          <span className="runtimeStarterHistoryFilterCount" aria-hidden="true">
-                            {failedStarterRefreshHistoryCount}
-                          </span>
-                        </button>
+                        {starterRefreshHistoryFilterOptions.map((filterOption) => (
+                          <button
+                            type="button"
+                            className={`runtimeStarterHistoryFilterButton${starterRefreshHistoryFilter === filterOption.id ? ' runtimeStarterHistoryFilterButtonActive' : ''}`}
+                            disabled={filterOption.id !== 'all' && filterOption.count === 0}
+                            onClick={() => setStarterRefreshHistoryFilter(filterOption.id)}
+                            aria-label={
+                              filterOption.count != null
+                                ? `Show ${filterOption.label.toLowerCase()} starter actions (${filterOption.count})`
+                                : `Show ${filterOption.label.toLowerCase()} starter actions`
+                            }
+                            key={filterOption.id}
+                            title={
+                              filterOption.count == null
+                                ? 'Show all starter actions in this browser session'
+                                : filterOption.count > 0
+                                  ? `Show ${filterOption.count} ${filterOption.label.toLowerCase()} starter action${filterOption.count === 1 ? '' : 's'}`
+                                  : `No ${filterOption.label.toLowerCase()} starter actions in this browser session`
+                            }
+                          >
+                            <span>{filterOption.label}</span>
+                            {filterOption.count != null ? (
+                              <span className="runtimeStarterHistoryFilterCount" aria-hidden="true">
+                                {filterOption.count}
+                              </span>
+                            ) : null}
+                          </button>
+                        ))}
                       </div>
                     </div>
                     {visibleStarterRefreshHistory.length > 0 ? (
@@ -1751,7 +1800,9 @@ function App() {
                         </article>
                       ))
                     ) : (
-                      <p className="runtimeStarterHistoryEmpty">No failed starter actions in this browser session.</p>
+                      <p className="runtimeStarterHistoryEmpty">
+                        No {activeStarterRefreshHistoryFilterLabel.toLowerCase()} starter actions in this browser session.
+                      </p>
                     )}
                   </div>
                 ) : null}
