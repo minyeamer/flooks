@@ -244,7 +244,14 @@ def _sorted_versions(dashboard_record: DashboardRecord) -> list[DashboardVersion
 
 
 def _to_dashboard_summary(dashboard_record: DashboardRecord) -> DashboardSummary:
-    latest_version = _get_version_record(dashboard_record, None)
+    versions = _sorted_versions(dashboard_record)
+    latest_version = versions[-1]
+    published_versions = [
+        version_record for version_record in versions if version_record.status == DashboardVersionStatus.PUBLISHED
+    ]
+    archived_versions = [
+        version_record for version_record in versions if version_record.status == DashboardVersionStatus.ARCHIVED
+    ]
 
     return DashboardSummary(
         id=str(dashboard_record.id),
@@ -255,6 +262,12 @@ def _to_dashboard_summary(dashboard_record: DashboardRecord) -> DashboardSummary
         owner_principal_key=dashboard_record.owner_principal_key,
         latest_version_number=dashboard_record.latest_version_number,
         latest_version_status=latest_version.status,
+        published_version_count=len(published_versions),
+        latest_published_version_number=
+        published_versions[-1].version_number if published_versions else None,
+        archived_version_count=len(archived_versions),
+        latest_archived_version_number=
+        archived_versions[-1].version_number if archived_versions else None,
         created_at=dashboard_record.created_at,
         updated_at=dashboard_record.updated_at,
     )

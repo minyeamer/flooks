@@ -101,6 +101,10 @@ type DashboardApiResponse = {
   ownerPrincipalKind: DashboardOwnerPrincipalKind;
   latestVersionNumber: number;
   latestVersionStatus: 'draft' | 'published' | 'archived';
+  publishedVersionCount: number;
+  latestPublishedVersionNumber: number | null;
+  archivedVersionCount: number;
+  latestArchivedVersionNumber: number | null;
   ownerPrincipalKey: string;
   updatedAt: string;
   document: DashboardDocument;
@@ -116,6 +120,10 @@ type DashboardSummaryResponse = {
   ownerPrincipalKey: string;
   latestVersionNumber: number;
   latestVersionStatus: 'draft' | 'published' | 'archived';
+  publishedVersionCount: number;
+  latestPublishedVersionNumber: number | null;
+  archivedVersionCount: number;
+  latestArchivedVersionNumber: number | null;
   updatedAt: string;
 };
 
@@ -2416,6 +2424,16 @@ function App() {
                     <div className="dashboardDirectoryLabels" aria-label="Dashboard summary metadata">
                       <span className="dashboardDirectoryTag">v{summary.latestVersionNumber}</span>
                       <span className="dashboardDirectoryTag">{summary.latestVersionStatus}</span>
+                      {summary.latestPublishedVersionNumber != null ? (
+                        <span className="dashboardDirectoryTag">
+                          Published v{summary.latestPublishedVersionNumber}
+                        </span>
+                      ) : null}
+                      {summary.archivedVersionCount > 0 ? (
+                        <span className="dashboardDirectoryTag">
+                          Archived {summary.archivedVersionCount}
+                        </span>
+                      ) : null}
                       <span className="dashboardDirectoryTag">{summary.ownerPrincipalKey}</span>
                       <span className="dashboardDirectoryTag">Updated {formattedSummaryUpdatedAt}</span>
                     </div>

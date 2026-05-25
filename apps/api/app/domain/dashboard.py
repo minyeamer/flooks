@@ -125,6 +125,10 @@ class DashboardSummary(DashboardModel):
     owner_principal_key: str
     latest_version_number: int
     latest_version_status: DashboardVersionStatus
+    published_version_count: int
+    latest_published_version_number: int | None
+    archived_version_count: int
+    latest_archived_version_number: int | None
     created_at: datetime
     updated_at: datetime
 

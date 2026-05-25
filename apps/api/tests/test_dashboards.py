@@ -63,6 +63,10 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert created_body["document"]["title"] == "Commerce Home"
     assert created_body["latestVersionNumber"] == 1
     assert created_body["latestVersionStatus"] == "draft"
+    assert created_body["publishedVersionCount"] == 0
+    assert created_body["latestPublishedVersionNumber"] is None
+    assert created_body["archivedVersionCount"] == 0
+    assert created_body["latestArchivedVersionNumber"] is None
     assert created_body["versions"][0]["summary"] == "Initial bootstrap version."
     assert created_body["document"]["panelLibrary"][0]["query"] == {
         "datasetKey": "mart_commerce_daily",
@@ -89,6 +93,10 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert len(list_body) == 1
     assert list_body[0]["slug"] == "commerce-home"
     assert list_body[0]["latestVersionNumber"] == 1
+    assert list_body[0]["publishedVersionCount"] == 0
+    assert list_body[0]["latestPublishedVersionNumber"] is None
+    assert list_body[0]["archivedVersionCount"] == 0
+    assert list_body[0]["latestArchivedVersionNumber"] is None
 
     update_payload = {
         "createdBy": "owner-2",
@@ -108,11 +116,25 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert updated_body["document"]["version"] == 2
     assert updated_body["latestVersionNumber"] == 2
     assert updated_body["latestVersionStatus"] == "published"
+    assert updated_body["publishedVersionCount"] == 1
+    assert updated_body["latestPublishedVersionNumber"] == 2
+    assert updated_body["archivedVersionCount"] == 0
+    assert updated_body["latestArchivedVersionNumber"] is None
     assert [version["versionNumber"] for version in updated_body["versions"]] == [1, 2]
     assert updated_body["document"]["panelLibrary"][0]["scorecard"]["valueField"] == "gmv"
     assert updated_body["document"]["panelLibrary"][2]["query"]["sort"] == [
         {"field": "revenue", "direction": "desc"}
     ]
+
+    refreshed_list_response = dashboard_client.get("/api/v1/dashboards")
+
+    assert refreshed_list_response.status_code == 200
+    refreshed_list_body = refreshed_list_response.json()
+    assert refreshed_list_body[0]["latestVersionStatus"] == "published"
+    assert refreshed_list_body[0]["publishedVersionCount"] == 1
+    assert refreshed_list_body[0]["latestPublishedVersionNumber"] == 2
+    assert refreshed_list_body[0]["archivedVersionCount"] == 0
+    assert refreshed_list_body[0]["latestArchivedVersionNumber"] is None
 
     version_one_response = dashboard_client.get("/api/v1/dashboards/commerce-home", params={"version": 1})
 
