@@ -134,6 +134,7 @@ type RuntimeGridMetrics = {
   columnWidth: number;
   rowHeight: number;
   previewRowSizePx: number;
+  previewHeightPx: number;
 };
 
 type RuntimeGridStyle = CSSProperties & {
@@ -268,22 +269,40 @@ function formatPlacementLabel(placement: PanelPlacement): string {
   return `Placement ${placement.x},${placement.y} · ${placement.width}×${placement.height}`;
 }
 
+function formatRuntimeCanvasLabel(
+  page: DashboardPage,
+  gridMetrics: RuntimeGridMetrics,
+): string {
+  return `Canvas ${page.width}×${page.height}px · Snap ${page.snapGrid.columnWidth}×${page.snapGrid.rowHeight}px · ${gridMetrics.columnCount}×${gridMetrics.rowCount} cells`;
+}
+
 function clampGridValue(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
 function getRuntimeGridMetrics(page: DashboardPage): RuntimeGridMetrics {
+  const previewRowSizePx = Math.max(12, Math.min(20, Math.round(page.snapGrid.rowHeight * 0.7)));
+
   return {
     columnCount: Math.max(1, Math.round(page.width / page.snapGrid.columnWidth)),
     rowCount: Math.max(1, Math.round(page.height / page.snapGrid.rowHeight)),
     columnWidth: page.snapGrid.columnWidth,
     rowHeight: page.snapGrid.rowHeight,
-    previewRowSizePx: Math.max(12, Math.min(20, Math.round(page.snapGrid.rowHeight * 0.7))),
+    previewRowSizePx,
+    previewHeightPx: Math.max(
+      360,
+      Math.min(780, Math.round((page.height / page.snapGrid.rowHeight) * previewRowSizePx)),
+    ),
   };
 }
 
-function getRuntimeCanvasStyle(gridMetrics: RuntimeGridMetrics): RuntimeGridStyle {
+function getRuntimeCanvasStyle(
+  page: DashboardPage,
+  gridMetrics: RuntimeGridMetrics,
+): RuntimeGridStyle {
   return {
+    aspectRatio: `${page.width} / ${page.height}`,
+    minHeight: `${gridMetrics.previewHeightPx}px`,
     '--runtime-grid-columns': String(gridMetrics.columnCount),
     '--runtime-grid-rows': String(gridMetrics.rowCount),
     '--runtime-grid-row-size': `${gridMetrics.previewRowSizePx}px`,
@@ -640,7 +659,14 @@ function App() {
   const activeDashboardPage = getActiveDashboardPage(dashboardDocument, activePageId);
   const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
   const runtimeGridMetrics = activeDashboardPage ? getRuntimeGridMetrics(activeDashboardPage) : null;
-  const runtimeCanvasStyle = runtimeGridMetrics ? getRuntimeCanvasStyle(runtimeGridMetrics) : undefined;
+  const runtimeCanvasStyle =
+    activeDashboardPage && runtimeGridMetrics
+      ? getRuntimeCanvasStyle(activeDashboardPage, runtimeGridMetrics)
+      : undefined;
+  const runtimeCanvasLabel =
+    activeDashboardPage && runtimeGridMetrics
+      ? formatRuntimeCanvasLabel(activeDashboardPage, runtimeGridMetrics)
+      : null;
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
   const heroSummary =
     overview?.summary ??
@@ -960,116 +986,119 @@ function App() {
                 query spec yet.
               </p>
             ) : (
-              <div className="runtimePanelList runtimeCanvas" style={runtimeCanvasStyle}>
-                {dashboardRuntimePanelEntries.map(({ panel, placement }) => {
-                  const runtime = panelRuntime[panel.id];
-                  const runtimePanelKey = `${panel.id}-${placement.x}-${placement.y}-${placement.zIndex}`;
-                  const runtimePanelStyle = runtimeGridMetrics
-                    ? getRuntimePanelStyle(placement, runtimeGridMetrics)
-                    : undefined;
+              <div className="runtimeCanvasFrame">
+                {runtimeCanvasLabel ? <p className="runtimeCanvasMeta">{runtimeCanvasLabel}</p> : null}
+                <div className="runtimePanelList runtimeCanvas" style={runtimeCanvasStyle}>
+                  {dashboardRuntimePanelEntries.map(({ panel, placement }) => {
+                    const runtime = panelRuntime[panel.id];
+                    const runtimePanelKey = `${panel.id}-${placement.x}-${placement.y}-${placement.zIndex}`;
+                    const runtimePanelStyle = runtimeGridMetrics
+                      ? getRuntimePanelStyle(placement, runtimeGridMetrics)
+                      : undefined;
 
-                  if (isScorecardPanel(panel)) {
-                    const value = runtime?.data?.results[0]?.[panel.scorecard.valueField];
+                    if (isScorecardPanel(panel)) {
+                      const value = runtime?.data?.results[0]?.[panel.scorecard.valueField];
 
-                    return (
-                      <article className="runtimeCanvasItem runtimeStat" key={runtimePanelKey} style={runtimePanelStyle}>
-                        <span>{panel.title}</span>
-                        <strong>
-                          {runtime?.state === 'ready'
-                            ? formatScorecardValue(
-                                value,
-                                panel.scorecard.valuePrefix,
-                                panel.scorecard.valueSuffix,
-                              )
-                            : runtime?.state === 'error'
-                              ? 'Unavailable'
-                              : 'Loading'}
-                        </strong>
-                        <p>{panel.scorecard.description}</p>
-                        <p className="runtimeMeta">
-                          {panel.datasetKey} ·{' '}
-                          {runtime?.data?.executionMetadata.connector ?? 'POST /query/execute'}
-                        </p>
-                        <p className="runtimeMeta">
-                          {runtime?.data?.executionMetadata.durationMs != null
-                            ? `${runtime.data.executionMetadata.durationMs} ms`
-                            : 'Awaiting panel result'}
-                        </p>
-                        <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
-                        {runtime?.state === 'error' && runtime.errorMessage ? (
-                          <p className="inlineNotice">{runtime.errorMessage}</p>
-                        ) : null}
-                      </article>
-                    );
-                  }
+                      return (
+                        <article className="runtimeCanvasItem runtimeStat" key={runtimePanelKey} style={runtimePanelStyle}>
+                          <span>{panel.title}</span>
+                          <strong>
+                            {runtime?.state === 'ready'
+                              ? formatScorecardValue(
+                                  value,
+                                  panel.scorecard.valuePrefix,
+                                  panel.scorecard.valueSuffix,
+                                )
+                              : runtime?.state === 'error'
+                                ? 'Unavailable'
+                                : 'Loading'}
+                          </strong>
+                          <p>{panel.scorecard.description}</p>
+                          <p className="runtimeMeta">
+                            {panel.datasetKey} ·{' '}
+                            {runtime?.data?.executionMetadata.connector ?? 'POST /query/execute'}
+                          </p>
+                          <p className="runtimeMeta">
+                            {runtime?.data?.executionMetadata.durationMs != null
+                              ? `${runtime.data.executionMetadata.durationMs} ms`
+                              : 'Awaiting panel result'}
+                          </p>
+                          <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+                          {runtime?.state === 'error' && runtime.errorMessage ? (
+                            <p className="inlineNotice">{runtime.errorMessage}</p>
+                          ) : null}
+                        </article>
+                      );
+                    }
 
-                  if (isTablePanel(panel)) {
-                    return (
-                      <div className="runtimeCanvasItem runtimeTableCard" key={runtimePanelKey} style={runtimePanelStyle}>
-                        <div className="runtimeTableHeader">
-                          <span className="kicker">{panel.title}</span>
-                          <span className="queryBadge">
-                            {panel.datasetKey} · top {panel.query.limit ?? 0}
-                          </span>
-                        </div>
-                        <p className="runtimeMeta">{panel.table.description}</p>
-                        <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+                    if (isTablePanel(panel)) {
+                      return (
+                        <div className="runtimeCanvasItem runtimeTableCard" key={runtimePanelKey} style={runtimePanelStyle}>
+                          <div className="runtimeTableHeader">
+                            <span className="kicker">{panel.title}</span>
+                            <span className="queryBadge">
+                              {panel.datasetKey} · top {panel.query.limit ?? 0}
+                            </span>
+                          </div>
+                          <p className="runtimeMeta">{panel.table.description}</p>
+                          <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
 
-                        {runtime?.state === 'ready' && runtime.data ? (
-                          (runtime.data.results.length ?? 0) > 0 ? (
-                            <div className="queryTableWrap">
-                              <table className="queryTable">
-                                <thead>
-                                  <tr>
-                                    {panel.table.columns.map((column) => (
-                                      <th key={column} scope="col">
-                                        {column}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {runtime.data.results.map((row, index) => (
-                                    <tr key={`row-${index}`}>
+                          {runtime?.state === 'ready' && runtime.data ? (
+                            (runtime.data.results.length ?? 0) > 0 ? (
+                              <div className="queryTableWrap">
+                                <table className="queryTable">
+                                  <thead>
+                                    <tr>
                                       {panel.table.columns.map((column) => (
-                                        <td key={`${index}-${column}`}>{formatQueryCellValue(row[column])}</td>
+                                        <th key={column} scope="col">
+                                          {column}
+                                        </th>
                                       ))}
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                                  </thead>
+                                  <tbody>
+                                    {runtime.data.results.map((row, index) => (
+                                      <tr key={`row-${index}`}>
+                                        {panel.table.columns.map((column) => (
+                                          <td key={`${index}-${column}`}>{formatQueryCellValue(row[column])}</td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <p className="callout">The table panel executed successfully, but the dataset returned no rows.</p>
+                            )
+                          ) : runtime?.state === 'error' ? (
+                            <p className="callout calloutError">
+                              {runtime.errorMessage ?? 'The table panel could not be rendered yet.'}
+                            </p>
                           ) : (
-                            <p className="callout">The table panel executed successfully, but the dataset returned no rows.</p>
-                          )
-                        ) : runtime?.state === 'error' ? (
-                          <p className="callout calloutError">
-                            {runtime.errorMessage ?? 'The table panel could not be rendered yet.'}
-                          </p>
-                        ) : (
-                          <p className="callout">
-                            Executing the active dashboard table panel against {API_BASE_URL}/query/execute
-                          </p>
-                        )}
-                      </div>
-                    );
-                  }
+                            <p className="callout">
+                              Executing the active dashboard table panel against {API_BASE_URL}/query/execute
+                            </p>
+                          )}
+                        </div>
+                      );
+                    }
 
-                  return (
-                    <article className="runtimeCanvasItem runtimeFallbackCard" key={runtimePanelKey} style={runtimePanelStyle}>
-                      <div className="runtimeTableHeader">
-                        <span className="kicker">{panel.title}</span>
-                        <span className="queryBadge">{panel.kind}</span>
-                      </div>
-                      <p className="runtimeMeta">
-                        This panel is stored on the active dashboard page, but the bootstrap shell does
-                        not render this panel kind yet.
-                      </p>
-                      <p className="runtimeMeta">{panel.datasetKey}</p>
-                      <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
-                    </article>
-                  );
-                })}
+                    return (
+                      <article className="runtimeCanvasItem runtimeFallbackCard" key={runtimePanelKey} style={runtimePanelStyle}>
+                        <div className="runtimeTableHeader">
+                          <span className="kicker">{panel.title}</span>
+                          <span className="queryBadge">{panel.kind}</span>
+                        </div>
+                        <p className="runtimeMeta">
+                          This panel is stored on the active dashboard page, but the bootstrap shell does
+                          not render this panel kind yet.
+                        </p>
+                        <p className="runtimeMeta">{panel.datasetKey}</p>
+                        <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+                      </article>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

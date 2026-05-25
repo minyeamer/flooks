@@ -383,16 +383,62 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.runtimeCanvasFrame {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(246, 239, 226, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 18px 32px rgba(24, 34, 45, 0.08);
+}
+
+.runtimeCanvasMeta {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(24, 34, 45, 0.06);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .runtimeCanvas {
   grid-auto-flow: dense;
   align-items: stretch;
   grid-template-columns: repeat(var(--runtime-grid-columns, 1), minmax(0, 1fr));
   grid-template-rows: repeat(var(--runtime-grid-rows, 1), minmax(var(--runtime-grid-row-size, 14px), auto));
+  width: 100%;
+  padding: 18px;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background-color: rgba(255, 251, 245, 0.92);
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.08)),
+    linear-gradient(to right, rgba(24, 34, 45, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(24, 34, 45, 0.05) 1px, transparent 1px);
+  background-size:
+    auto,
+    calc(100% / var(--runtime-grid-columns, 1)) 100%,
+    100% var(--runtime-grid-row-size, 14px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .runtimeCanvasItem {
   grid-column: var(--runtime-col-start, auto) / span var(--runtime-col-span, 1);
   grid-row: var(--runtime-row-start, auto) / span var(--runtime-row-span, 1);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .runtimeStat,
@@ -400,7 +446,8 @@ h1 {
 .runtimeFallbackCard {
   border-radius: 18px;
   border: 1px solid rgba(24, 34, 45, 0.08);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 14px 24px rgba(24, 34, 45, 0.08);
 }
 
 .runtimeStat {
@@ -745,9 +792,16 @@ h1 {
     gap: 6px;
   }
 
+  .runtimeCanvasFrame {
+    padding: 14px;
+  }
+
   .runtimeCanvas {
+    aspect-ratio: auto !important;
     grid-template-columns: 1fr;
     grid-template-rows: none;
+    min-height: 0 !important;
+    padding: 14px;
   }
 
   .runtimeCanvasItem {
