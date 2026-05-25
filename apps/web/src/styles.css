@@ -383,6 +383,18 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.runtimeCanvas {
+  grid-auto-flow: dense;
+  align-items: stretch;
+  grid-template-columns: repeat(var(--runtime-grid-columns, 1), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--runtime-grid-rows, 1), minmax(var(--runtime-grid-row-size, 14px), auto));
+}
+
+.runtimeCanvasItem {
+  grid-column: var(--runtime-col-start, auto) / span var(--runtime-col-span, 1);
+  grid-row: var(--runtime-row-start, auto) / span var(--runtime-row-span, 1);
+}
+
 .runtimeStat,
 .runtimeTableCard,
 .runtimeFallbackCard {
@@ -468,7 +480,6 @@ h1 {
 .runtimeTableCard,
 .runtimeFallbackCard {
   padding: 18px;
-  grid-column: 1 / -1;
 }
 
 .runtimeTableHeader {
@@ -732,6 +743,16 @@ h1 {
   .runtimeToolbar {
     flex-direction: column;
     gap: 6px;
+  }
+
+  .runtimeCanvas {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .runtimeCanvasItem {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .referenceSummary {

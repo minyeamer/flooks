@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 
 import {
   dataSourceKinds,
   starterDashboard,
   systemRoles,
   type DashboardDocument,
+  type DashboardPage,
   type PanelPlacement,
   type PanelRef,
 } from '@flooks/dashboard-schema';
@@ -127,6 +128,24 @@ type RuntimePanelEntry = {
   placement: PanelPlacement;
 };
 
+type RuntimeGridMetrics = {
+  columnCount: number;
+  rowCount: number;
+  columnWidth: number;
+  rowHeight: number;
+  previewRowSizePx: number;
+};
+
+type RuntimeGridStyle = CSSProperties & {
+  '--runtime-grid-columns'?: string;
+  '--runtime-grid-rows'?: string;
+  '--runtime-grid-row-size'?: string;
+  '--runtime-col-start'?: string;
+  '--runtime-col-span'?: string;
+  '--runtime-row-start'?: string;
+  '--runtime-row-span'?: string;
+};
+
 const numberFormatter = new Intl.NumberFormat('en-US');
 
 function isScorecardPanel(
@@ -247,6 +266,61 @@ function formatScorecardValue(
 
 function formatPlacementLabel(placement: PanelPlacement): string {
   return `Placement ${placement.x},${placement.y} · ${placement.width}×${placement.height}`;
+}
+
+function clampGridValue(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function getRuntimeGridMetrics(page: DashboardPage): RuntimeGridMetrics {
+  return {
+    columnCount: Math.max(1, Math.round(page.width / page.snapGrid.columnWidth)),
+    rowCount: Math.max(1, Math.round(page.height / page.snapGrid.rowHeight)),
+    columnWidth: page.snapGrid.columnWidth,
+    rowHeight: page.snapGrid.rowHeight,
+    previewRowSizePx: Math.max(12, Math.min(20, Math.round(page.snapGrid.rowHeight * 0.7))),
+  };
+}
+
+function getRuntimeCanvasStyle(gridMetrics: RuntimeGridMetrics): RuntimeGridStyle {
+  return {
+    '--runtime-grid-columns': String(gridMetrics.columnCount),
+    '--runtime-grid-rows': String(gridMetrics.rowCount),
+    '--runtime-grid-row-size': `${gridMetrics.previewRowSizePx}px`,
+  };
+}
+
+function getRuntimePanelStyle(
+  placement: PanelPlacement,
+  gridMetrics: RuntimeGridMetrics,
+): RuntimeGridStyle {
+  const columnStart = clampGridValue(
+    Math.floor(placement.x / gridMetrics.columnWidth) + 1,
+    1,
+    gridMetrics.columnCount,
+  );
+  const rowStart = clampGridValue(
+    Math.floor(placement.y / gridMetrics.rowHeight) + 1,
+    1,
+    gridMetrics.rowCount,
+  );
+  const columnSpan = clampGridValue(
+    Math.ceil(placement.width / gridMetrics.columnWidth),
+    1,
+    gridMetrics.columnCount - columnStart + 1,
+  );
+  const rowSpan = clampGridValue(
+    Math.ceil(placement.height / gridMetrics.rowHeight),
+    1,
+    gridMetrics.rowCount - rowStart + 1,
+  );
+
+  return {
+    '--runtime-col-start': String(columnStart),
+    '--runtime-col-span': String(columnSpan),
+    '--runtime-row-start': String(rowStart),
+    '--runtime-row-span': String(rowSpan),
+  };
 }
 
 function getDefaultDashboardPageId(dashboardDocument: DashboardDocument): string | null {
@@ -565,6 +639,8 @@ function App() {
   const liveModules = system?.modules ?? [];
   const activeDashboardPage = getActiveDashboardPage(dashboardDocument, activePageId);
   const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
+  const runtimeGridMetrics = activeDashboardPage ? getRuntimeGridMetrics(activeDashboardPage) : null;
+  const runtimeCanvasStyle = runtimeGridMetrics ? getRuntimeCanvasStyle(runtimeGridMetrics) : undefined;
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
   const heroSummary =
     overview?.summary ??
@@ -884,16 +960,19 @@ function App() {
                 query spec yet.
               </p>
             ) : (
-              <div className="runtimePanelList">
+              <div className="runtimePanelList runtimeCanvas" style={runtimeCanvasStyle}>
                 {dashboardRuntimePanelEntries.map(({ panel, placement }) => {
                   const runtime = panelRuntime[panel.id];
                   const runtimePanelKey = `${panel.id}-${placement.x}-${placement.y}-${placement.zIndex}`;
+                  const runtimePanelStyle = runtimeGridMetrics
+                    ? getRuntimePanelStyle(placement, runtimeGridMetrics)
+                    : undefined;
 
                   if (isScorecardPanel(panel)) {
                     const value = runtime?.data?.results[0]?.[panel.scorecard.valueField];
 
                     return (
-                      <article className="runtimeStat" key={runtimePanelKey}>
+                      <article className="runtimeCanvasItem runtimeStat" key={runtimePanelKey} style={runtimePanelStyle}>
                         <span>{panel.title}</span>
                         <strong>
                           {runtime?.state === 'ready'
@@ -926,7 +1005,7 @@ function App() {
 
                   if (isTablePanel(panel)) {
                     return (
-                      <div className="runtimeTableCard" key={runtimePanelKey}>
+                      <div className="runtimeCanvasItem runtimeTableCard" key={runtimePanelKey} style={runtimePanelStyle}>
                         <div className="runtimeTableHeader">
                           <span className="kicker">{panel.title}</span>
                           <span className="queryBadge">
@@ -977,7 +1056,7 @@ function App() {
                   }
 
                   return (
-                    <article className="runtimeFallbackCard" key={runtimePanelKey}>
+                    <article className="runtimeCanvasItem runtimeFallbackCard" key={runtimePanelKey} style={runtimePanelStyle}>
                       <div className="runtimeTableHeader">
                         <span className="kicker">{panel.title}</span>
                         <span className="queryBadge">{panel.kind}</span>
