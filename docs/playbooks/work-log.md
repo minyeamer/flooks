@@ -522,3 +522,21 @@ Functional result:
 
 Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py apps/api/tests/test_system.py`
+
+## 84cba30a · Starter refresh shell action
+
+Intent: expose the new starter refresh route directly in the web shell so operators can backfill the canonical starter dashboard without leaving the runtime preview surface.
+
+What changed:
+- `apps/web/src/App.tsx` extracted the dashboard document fetch path into a reusable helper so the initial load path and later manual refresh path share the same fallback and notice behavior.
+- `apps/web/src/App.tsx` added a `Refresh starter` action in the live panel runtime toolbar that calls `POST /api/v1/dashboards/commerce-home/refresh-starter` and keeps the button disabled while the request is in flight.
+- `apps/web/src/App.tsx` also applies the refreshed dashboard payload directly to the active shell state so page selection, panel runtime loading, and source labeling move to the newest persisted starter version immediately after the action completes.
+- `apps/web/src/App.tsx` surfaces success and failure outcomes through the existing dashboard notice area so operators can tell whether the starter dashboard was created, refreshed, or rejected by the backend guard.
+
+Functional result:
+- The web shell can now trigger starter dashboard backfill from the same surface that previews the dashboard runtime.
+- Environments that only had the in-memory starter fallback can switch to the persisted canonical starter document without leaving the UI.
+- The frontend path stays consistent because both initial load and manual refresh reuse the same dashboard loading logic and notice surface.
+
+Validation:
+- `npm run build:web`
