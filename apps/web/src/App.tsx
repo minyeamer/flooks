@@ -1325,12 +1325,24 @@ function App() {
   }
 
   async function handleCreateDashboardVersion(): Promise<void> {
+    await persistDashboardVersion();
+  }
+
+  async function persistDashboardVersion(
+    options: {
+      status?: DashboardVersionStatus;
+      summary?: string | null;
+    } = {},
+  ): Promise<void> {
     if (selectedDashboardSummary == null) {
       return;
     }
 
     const createdBy = dashboardVersionDraftCreatedBy.trim();
-    const summary = dashboardVersionDraftSummary.trim();
+    const nextStatus = options.status ?? dashboardVersionDraftStatus;
+    const summaryInput = options.summary ?? dashboardVersionDraftSummary;
+    const summary =
+      summaryInput == null ? null : summaryInput.trim().length > 0 ? summaryInput.trim() : null;
     const nextDescription = dashboardVersionDraftDescription.trim();
 
     if (createdBy.length === 0) {
@@ -1351,8 +1363,8 @@ function App() {
         },
         body: JSON.stringify({
           createdBy,
-          summary: summary.length > 0 ? summary : null,
-          status: dashboardVersionDraftStatus,
+          summary,
+          status: nextStatus,
           description: nextDescription.length > 0 ? nextDescription : null,
           document: dashboardDocument,
         }),
@@ -1372,7 +1384,11 @@ function App() {
       setSelectedDashboardVersionNumber(null);
       applyDashboardPayload(payload);
       setDashboardNotice(
-        `Dashboard '${payload.slug}' advanced to persisted version ${payload.latestVersionNumber}.`,
+        nextStatus === 'published'
+          ? `Dashboard '${payload.slug}' published as version ${payload.latestVersionNumber}.`
+          : nextStatus === 'archived'
+            ? `Dashboard '${payload.slug}' archived as version ${payload.latestVersionNumber}.`
+            : `Dashboard '${payload.slug}' advanced to persisted version ${payload.latestVersionNumber}.`,
       );
       setDashboardNoticeTone('success');
       void loadDashboardDirectory();
@@ -1952,6 +1968,26 @@ function App() {
     : isViewingHistoricalDashboardVersion
       ? `Persist a new latest revision using the currently loaded v${selectedDashboardVersionNumber} document.`
       : `Persist a new latest revision for dashboard '${selectedDashboardSummary.slug}'.`;
+  const isPublishDashboardVersionDisabled =
+    isCreateDashboardVersionDisabled ||
+    (isViewingLatestDashboardVersion && latestDashboardVersionSummary?.status === 'published');
+  const publishDashboardVersionTitle = isPublishDashboardVersionDisabled
+    ? isViewingLatestDashboardVersion && latestDashboardVersionSummary?.status === 'published'
+      ? 'The latest persisted dashboard revision is already published.'
+      : 'Select a persisted dashboard before publishing it.'
+    : isViewingHistoricalDashboardVersion
+      ? `Publish the currently loaded v${selectedDashboardVersionNumber} document as the next latest revision.`
+      : `Publish the currently loaded dashboard as the next latest revision.`;
+  const isArchiveDashboardVersionDisabled =
+    isCreateDashboardVersionDisabled ||
+    (isViewingLatestDashboardVersion && latestDashboardVersionSummary?.status === 'archived');
+  const archiveDashboardVersionTitle = isArchiveDashboardVersionDisabled
+    ? isViewingLatestDashboardVersion && latestDashboardVersionSummary?.status === 'archived'
+      ? 'The latest persisted dashboard revision is already archived.'
+      : 'Select a persisted dashboard before archiving it.'
+    : isViewingHistoricalDashboardVersion
+      ? `Archive the currently loaded v${selectedDashboardVersionNumber} document as the next latest revision.`
+      : `Archive the currently loaded dashboard as the next latest revision.`;
   const starterRefreshHistoryFilterCounts: Record<StarterRefreshHistoryKind, number> = {
     created: starterRefreshHistory.filter((entry) => entry.actionKind === 'created').length,
     refreshed: starterRefreshHistory.filter((entry) => entry.actionKind === 'refreshed').length,
@@ -2524,6 +2560,53 @@ function App() {
                       placeholder="Leave blank to keep the current dashboard description."
                     />
                   </label>
+                </div>
+                <div className="dashboardVersionComposerActions">
+                  <p className="runtimeMeta">
+                    Quick lifecycle actions create a new latest revision with the selected status.
+                  </p>
+                  <div className="runtimeControlGroup" aria-label="Dashboard version lifecycle shortcuts">
+                    <button
+                      type="button"
+                      className="runtimeControl"
+                      disabled={isPublishDashboardVersionDisabled}
+                      onClick={() => {
+                        void persistDashboardVersion({
+                          status: 'published',
+                          summary:
+                            dashboardVersionDraftSummary.trim().length > 0
+                              ? dashboardVersionDraftSummary
+                              : isViewingHistoricalDashboardVersion &&
+                                  selectedDashboardVersionNumber != null
+                                ? `Published from v${selectedDashboardVersionNumber} in the web shell.`
+                                : 'Published from the web shell.',
+                        });
+                      }}
+                      title={publishDashboardVersionTitle}
+                    >
+                      Publish as latest
+                    </button>
+                    <button
+                      type="button"
+                      className="runtimeControl"
+                      disabled={isArchiveDashboardVersionDisabled}
+                      onClick={() => {
+                        void persistDashboardVersion({
+                          status: 'archived',
+                          summary:
+                            dashboardVersionDraftSummary.trim().length > 0
+                              ? dashboardVersionDraftSummary
+                              : isViewingHistoricalDashboardVersion &&
+                                  selectedDashboardVersionNumber != null
+                                ? `Archived from v${selectedDashboardVersionNumber} in the web shell.`
+                                : 'Archived from the web shell.',
+                        });
+                      }}
+                      title={archiveDashboardVersionTitle}
+                    >
+                      Archive as latest
+                    </button>
+                  </div>
                 </div>
                 <div className="dashboardVersionComposerActions">
                   <p className="runtimeMeta">
