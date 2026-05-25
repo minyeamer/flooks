@@ -629,3 +629,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 64da4184 · Confirm clear starter history
+
+Intent: reduce accidental loss of the session-local starter action trail by requiring a lightweight explicit confirmation before the shell clears it.
+
+What changed:
+- `apps/web/src/App.tsx` added a small armed-state toggle for the clear-history control so the first click switches the button into a confirmation state instead of immediately wiping the recent action trail.
+- `apps/web/src/App.tsx` now reuses the existing active runtime-control styling for the armed confirmation state and swaps the button label to `Confirm clear` while the action is pending confirmation.
+- `apps/web/src/App.tsx` also disarms the confirmation state automatically when starter history changes or a refresh starts, which avoids leaving a stale destructive action armed after surrounding state updates.
+
+Functional result:
+- Operators now get a lightweight second step before the shell removes the session-persisted starter action trail.
+- The confirmation state stays inside the existing toolbar and does not require a modal or broader layout change.
+- Refresh and history updates automatically collapse the armed clear state, which keeps the destructive control aligned with the current runtime context.
+
+Validation:
+- `npm run build:web`
