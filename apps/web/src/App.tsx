@@ -2050,6 +2050,14 @@ function App() {
   const createDashboardTitle = isCreateDashboardDisabled
     ? 'Wait for the current dashboard creation request to finish.'
     : `Clone the currently loaded dashboard into a new persisted slug from ${createDashboardSourceLabel}.`;
+  const formattedSelectedDashboardUpdatedAt =
+    selectedDashboardSummary != null
+      ? dateTimeFormatter.format(new Date(selectedDashboardSummary.updatedAt))
+      : null;
+  const deleteSelectedDashboardVersionCount = selectedDashboardSummary?.latestVersionNumber ?? 0;
+  const deleteSelectedDashboardFallbackSlug =
+    dashboardSummaries.find((summary) => summary.slug !== selectedDashboardSlug)?.slug ??
+    starterDashboard.key;
   const isDeleteSelectedDashboardDisabled =
     selectedDashboardSummary == null ||
     selectedDashboardSummary.slug === starterDashboard.key ||
@@ -2277,6 +2285,32 @@ function App() {
                 </div>
                 <span className="dashboardDirectoryTag">Target: {selectedDashboardSummary.slug}</span>
               </div>
+              <div className="dashboardDirectoryLabels" aria-label="Delete target metadata">
+                <span className="dashboardDirectoryTag">
+                  {deleteSelectedDashboardVersionCount} revision
+                  {deleteSelectedDashboardVersionCount === 1 ? '' : 's'}
+                </span>
+                <span className="dashboardDirectoryTag">{selectedDashboardSummary.latestVersionStatus}</span>
+                <span className="dashboardDirectoryTag">Owner {selectedDashboardSummary.ownerPrincipalKey}</span>
+                {formattedSelectedDashboardUpdatedAt ? (
+                  <span className="dashboardDirectoryTag">
+                    Updated {formattedSelectedDashboardUpdatedAt}
+                  </span>
+                ) : null}
+              </div>
+              {isDeleteDashboardArmed && selectedDashboardSummary.slug !== starterDashboard.key ? (
+                <div className="dashboardDeleteWarning" role="alert">
+                  <strong>
+                    Delete '{selectedDashboardSummary.title}' now?
+                  </strong>
+                  <p>
+                    This removes dashboard '{selectedDashboardSummary.slug}' and all{' '}
+                    {deleteSelectedDashboardVersionCount} persisted revision
+                    {deleteSelectedDashboardVersionCount === 1 ? '' : 's'}, then switches the shell to{' '}
+                    '{deleteSelectedDashboardFallbackSlug}'.
+                  </p>
+                </div>
+              ) : null}
               <div className="dashboardVersionComposerActions">
                 <p className="runtimeMeta">
                   {selectedDashboardSummary.slug === starterDashboard.key
