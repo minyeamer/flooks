@@ -1062,6 +1062,8 @@ function App() {
   const [dashboardCreateDraftStatus, setDashboardCreateDraftStatus] =
     useState<DashboardVersionStatus>('draft');
   const [isCreatingDashboard, setIsCreatingDashboard] = useState<boolean>(false);
+  const [isDeleteDashboardArmed, setIsDeleteDashboardArmed] = useState<boolean>(false);
+  const [isDeletingDashboard, setIsDeletingDashboard] = useState<boolean>(false);
   const [dashboardVersionDraftCreatedBy, setDashboardVersionDraftCreatedBy] = useState<string>('web-shell');
   const [dashboardVersionDraftSummary, setDashboardVersionDraftSummary] = useState<string>('');
   const [dashboardVersionDraftDescription, setDashboardVersionDraftDescription] = useState<string>('');
@@ -1107,6 +1109,7 @@ function App() {
     setPersistedDashboardUpdatedAt(payload.updatedAt);
     setPersistedDashboardVersionStatus(payload.latestVersionStatus);
     setDashboardOwnerPrincipalKey(payload.ownerPrincipalKey);
+    setIsDeleteDashboardArmed(false);
     setDashboardCreateDraftSlug(getSuggestedDashboardSlug(payload.slug));
     setDashboardCreateDraftTitle(getSuggestedDashboardTitle(payload.document.title));
     setDashboardCreateDraftDescription(payload.description ?? '');
@@ -1133,6 +1136,7 @@ function App() {
     setPersistedDashboardUpdatedAt(null);
     setPersistedDashboardVersionStatus(null);
     setDashboardOwnerPrincipalKey(null);
+    setIsDeleteDashboardArmed(false);
     setDashboardCreateDraftSlug(getSuggestedDashboardSlug(starterDashboard.key));
     setDashboardCreateDraftTitle(getSuggestedDashboardTitle(starterDashboard.title));
     setDashboardCreateDraftDescription('');
@@ -1461,6 +1465,49 @@ function App() {
     }
   }
 
+  async function handleDeleteSelectedDashboard(): Promise<void> {
+    if (selectedDashboardSummary == null || selectedDashboardSummary.slug === starterDashboard.key) {
+      return;
+    }
+
+    const deletingSlug = selectedDashboardSummary.slug;
+    const fallbackSlug =
+      dashboardSummaries.find((summary) => summary.slug !== deletingSlug)?.slug ?? starterDashboard.key;
+
+    try {
+      setIsDeleteDashboardArmed(false);
+      setIsDeletingDashboard(true);
+      setDashboardNotice(null);
+      setDashboardNoticeTone('default');
+
+      const response = await fetch(`${API_BASE_URL}/dashboards/${deletingSlug}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(response, `Unable to delete dashboard '${deletingSlug}'.`),
+        );
+      }
+
+      setDashboardSummaries((currentSummaries) =>
+        currentSummaries.filter((summary) => summary.slug !== deletingSlug),
+      );
+      setSelectedDashboardVersionNumber(null);
+      setSelectedDashboardSlug(fallbackSlug);
+      setDashboardNotice(`Dashboard '${deletingSlug}' and its persisted versions were deleted.`);
+      setDashboardNoticeTone('success');
+      void loadDashboardDirectory();
+    } catch (error) {
+      setDashboardNotice(
+        error instanceof Error ? error.message : `Unable to delete dashboard '${deletingSlug}'.`,
+      );
+      setDashboardNoticeTone('error');
+    } finally {
+      setIsDeletingDashboard(false);
+    }
+  }
+
   async function handleRefreshStarterDashboard(): Promise<void> {
     const previousPersistedVersion = persistedDashboardVersion;
 
@@ -1707,8 +1754,26 @@ function App() {
   }, [isClearStarterHistoryArmed]);
 
   useEffect(() => {
+    if (!isDeleteDashboardArmed) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsDeleteDashboardArmed(false);
+    }, clearStarterHistoryConfirmTimeoutMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isDeleteDashboardArmed]);
+
+  useEffect(() => {
     setIsClearStarterHistoryArmed(false);
   }, [starterRefreshHistory]);
+
+  useEffect(() => {
+    setIsDeleteDashboardArmed(false);
+  }, [selectedDashboardSlug]);
 
   useEffect(() => {
     const validOpenEntryIds = new Set(
@@ -1985,6 +2050,18 @@ function App() {
   const createDashboardTitle = isCreateDashboardDisabled
     ? 'Wait for the current dashboard creation request to finish.'
     : `Clone the currently loaded dashboard into a new persisted slug from ${createDashboardSourceLabel}.`;
+  const isDeleteSelectedDashboardDisabled =
+    selectedDashboardSummary == null ||
+    selectedDashboardSummary.slug === starterDashboard.key ||
+    isDeletingDashboard;
+  const deleteSelectedDashboardTitle =
+    selectedDashboardSummary == null
+      ? 'Select a persisted dashboard before deleting it.'
+      : selectedDashboardSummary.slug === starterDashboard.key
+        ? 'Delete stays disabled for the canonical starter dashboard.'
+        : isDeleteDashboardArmed
+          ? `Click again within ${clearStarterHistoryConfirmTimeoutMs / 1000} seconds to delete dashboard '${selectedDashboardSummary.slug}' and all persisted revisions.`
+          : `Delete dashboard '${selectedDashboardSummary.slug}' and all persisted revisions from the metadata store.`;
   const runtimePreviewLabel = activeDashboardPage
     ? `${activeDashboardPage.title} · ${dashboardRuntimePanelEntries.length} live panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`
     : `${dashboardRuntimePanelEntries.length} live runtime panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`;
@@ -2189,6 +2266,46 @@ function App() {
               </button>
             </div>
           </div>
+          {selectedDashboardSummary != null ? (
+            <div className="dashboardVersionComposer">
+              <div className="dashboardVersionComposerHeader">
+                <div>
+                  <h3>Delete selected dashboard</h3>
+                  <p className="runtimeMeta">
+                    Remove the selected dashboard and every persisted revision from the metadata store.
+                  </p>
+                </div>
+                <span className="dashboardDirectoryTag">Target: {selectedDashboardSummary.slug}</span>
+              </div>
+              <div className="dashboardVersionComposerActions">
+                <p className="runtimeMeta">
+                  {selectedDashboardSummary.slug === starterDashboard.key
+                    ? 'The canonical starter dashboard stays protected in the shell so the default seed remains available.'
+                    : 'This action deletes the dashboard summary plus all of its version history.'}
+                </p>
+                <button
+                  type="button"
+                  className={`runtimeControl${isDeleteDashboardArmed ? ' runtimeControlActive' : ''}`}
+                  disabled={isDeleteSelectedDashboardDisabled}
+                  onClick={() => {
+                    if (!isDeleteDashboardArmed) {
+                      setIsDeleteDashboardArmed(true);
+                      return;
+                    }
+
+                    void handleDeleteSelectedDashboard();
+                  }}
+                  title={deleteSelectedDashboardTitle}
+                >
+                  {isDeletingDashboard
+                    ? 'Deleting dashboard...'
+                    : isDeleteDashboardArmed
+                      ? `Confirm delete (${clearStarterHistoryConfirmTimeoutMs / 1000}s)`
+                      : 'Delete selected dashboard'}
+                </button>
+              </div>
+            </div>
+          ) : null}
           {dashboardDirectoryState === 'error' ? (
             <p className="callout calloutError">
               {dashboardDirectoryErrorMessage ?? 'The dashboard directory is not reachable yet.'}
