@@ -907,3 +907,21 @@ Functional result:
 Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
 - `npm run build:web`
+
+## 5e1f9b1e · Jump to dashboard runtime
+
+Intent: make the actual live dashboard surface easier to reach from the homepage so operators can jump directly into the runtime preview instead of reading the overview panels first.
+
+What changed:
+- `apps/web/src/App.tsx` added hero jump actions that link directly to the live dashboard runtime section and the API reference section.
+- `apps/web/src/App.tsx` now surfaces a compact runtime-preview label in the hero card so the active page title and live panel count are visible above the fold.
+- `apps/web/src/App.tsx` also renamed the runtime section labels to `Dashboard Runtime` and `Live dashboard preview` to make the page's real dashboard surface more explicit.
+- `apps/web/src/styles.css` added hero action styling and section scroll-margin support so anchor navigation lands cleanly inside the page layout.
+
+Functional result:
+- Operators can jump straight from the hero area to the live dashboard preview without hunting through the roadmap and API overview panels.
+- The homepage now signals above the fold that a real dashboard runtime is already present, including the active page and live panel count.
+- In-page navigation feels more like an application shell and less like a static landing page.
+
+Validation:
+- `npm run build:web`
