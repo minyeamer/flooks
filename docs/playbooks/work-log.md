@@ -540,3 +540,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 5170959e · Starter refresh guard status UI
+
+Intent: make the starter refresh action safer and more understandable by showing the current starter ownership state before operators click the button.
+
+What changed:
+- `apps/web/src/App.tsx` extended the dashboard detail state to keep the persisted starter version, owner key, and notice tone alongside the existing dashboard document.
+- `apps/web/src/App.tsx` added derived starter status messaging in the runtime toolbar so the shell now distinguishes between in-memory starter fallback, bootstrap-managed persisted starter dashboards, and user-managed starter dashboards.
+- `apps/web/src/App.tsx` also disables the `Refresh starter` action proactively when the persisted starter dashboard is user-managed and upgrades the notice area to render success and error outcomes with different visual tones.
+- `apps/web/src/styles.css` added starter status pill styling plus a success callout treatment so the new operator-facing state is readable inside the existing runtime panel surface.
+
+Functional result:
+- Operators can now tell from the shell whether starter refresh will persist a seed, recheck a bootstrap-managed starter, or be blocked by the backend guard.
+- The UI now prevents the most obvious invalid refresh attempt locally instead of waiting for a backend `409` response.
+- Starter refresh outcomes are easier to scan because success and failure notices no longer share the same neutral callout styling.
+
+Validation:
+- `npm run build:web`
