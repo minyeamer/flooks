@@ -275,247 +275,6 @@ Functional result:
 Validation:
 - `npm run build:web`
 
-## 2db4c56f · Enforce dataset grants on query routes
-
-Intent: turn the existing `dataset_grant` metadata table into real governed-query visibility enforcement so dataset discovery and execution follow the hidden-resource policy instead of exposing every manifest unconditionally.
-
-What changed:
-- `apps/api/app/query/access.py` added a request-scoped dataset access context, parses `X-FLooks-User`, `X-FLooks-Teams`, `X-FLooks-Department`, `X-FLooks-Role`, and `X-FLooks-Workspace` headers, and filters dataset manifests by matching `dataset_grant` rows from the metadata database.
-- `apps/api/app/api/routes/query.py` now uses the metadata session plus the access context to filter `/api/v1/query/bootstrap` results and to validate or execute queries only against the caller's accessible dataset registry.
-- `apps/api/app/query/validator.py` now accepts an injected manifest registry so route-level access filtering can reuse the same semantic validator instead of duplicating manifest checks.
-- `apps/api/tests/test_query.py` now runs against an in-memory metadata database override and covers matching-grant bootstrap filtering plus validate/execute behavior that hides unauthorized datasets as `Unknown dataset ...`.
-- `apps/api/app/api/routes/reference.py` and `apps/api/tests/test_system.py` now document and assert the new dataset access headers plus the hidden-on-deny behavior in the structured API reference.
-
-Functional result:
-- Dataset grants now affect the live governed-query surfaces instead of existing only as metadata schema.
-- `/api/v1/query/bootstrap` hides datasets that have grant rows but do not match the current request principal context.
-- `/api/v1/query/validate` and `/api/v1/query/execute` now treat unauthorized datasets as unknown datasets, which preserves the hidden-resource behavior while keeping datasets with no grant rows public by default.
-
-Validation:
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py`
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
-
-## 67ae26a1 · Add dataset grant management routes
-
-Intent: make the new dataset-grant enforcement path operational by exposing a small control-plane API, so operators can manage dataset visibility without writing directly to the metadata database.
-
-What changed:
-- `apps/api/app/domain/identity.py` added typed request and response models for dataset grant records, including the idempotent upsert payload and the list response shape.
-- `apps/api/app/api/routes/identity.py` now exposes `GET /api/v1/identity/dataset-grants`, `PUT /api/v1/identity/dataset-grants`, and `DELETE /api/v1/identity/dataset-grants/{grant_id}` on top of the existing metadata session and validates that new grants reference a known dataset manifest key.
-- `apps/api/tests/test_identity.py` added focused CRUD coverage for dataset grants, rejection of unknown dataset keys, and an integration check showing that grants created through the new route immediately affect `/api/v1/query/bootstrap` visibility.
-- `apps/api/app/api/routes/overview.py`, `apps/api/app/api/routes/reference.py`, and `apps/api/tests/test_system.py` now advertise and assert the new dataset-grant management surfaces in the live overview and structured API reference.
-
-Functional result:
-- Dataset grants can now be listed, created idempotently, and deleted through the API instead of requiring direct SQL or manual metadata edits.
-- Unknown dataset keys are rejected before they can drift into the permission table, keeping the grant control plane aligned with the current dataset manifest registry.
-- The governed-query hidden-on-deny behavior now has a usable operator-facing control plane, which makes the grant enforcement slice practical to exercise in development and future admin tooling.
-
-Validation:
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_identity.py`
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
-
-## 4625f555 · Add web dataset grant manager
-
-Intent: make the dataset-grant control plane usable from the live shell so operators can change governed-query visibility and immediately see the access-filtered dataset bootstrap without leaving the browser.
-
-What changed:
-- `apps/api/app/domain/identity.py`, `apps/api/app/api/routes/identity.py`, and `apps/api/tests/test_identity.py` extended the dataset-grant list response with a stable `catalog_datasets` section that exposes the known manifest catalog even when `/query/bootstrap` is hidden by grant evaluation.
-- `apps/web/src/App.tsx` now loads dataset grants and the access-filtered query bootstrap alongside the existing shell state, renders a new `Dataset Grants` panel, and lets operators preview `X-FLooks-User|Teams|Department|Role|Workspace` header contexts directly from the UI.
-- `apps/web/src/App.tsx` also added an in-shell dataset grant composer backed by `PUT /api/v1/identity/dataset-grants`, plus inline delete controls backed by `DELETE /api/v1/identity/dataset-grants/{grant_id}`.
-- `apps/web/src/styles.css` added the layout and card styling for the new dataset grant preview, grant composer, and persisted grant list.
-- `apps/api/app/api/routes/reference.py` and `apps/api/tests/test_system.py` now document and assert the catalog-bearing dataset-grant list response so the structured API reference stays aligned with the live control-plane contract.
-
-Functional result:
-- The live shell can now manage dataset grants without direct SQL, which makes the hidden-on-deny query enforcement practical to exercise from the browser.
-- Operators can preview exactly which datasets remain visible for a chosen principal context before or after saving a grant.
-- The shell now has enough catalog context to keep offering valid dataset grant targets even after all governed-query datasets are hidden by grant rules.
-
-Validation:
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_identity.py`
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
-- `npm run build:web`
-
-## b766c2b0 · Sync runtime with dataset access context
-
-Intent: remove the last mismatch between dataset visibility preview and live panel execution by making the dashboard runtime follow the same applied access context that the dataset-grant panel previews.
-
-What changed:
-- `apps/web/src/App.tsx` now keeps the last successfully previewed dataset access headers as applied runtime state instead of treating the preview form as informational only.
-- `apps/web/src/App.tsx` now sends those applied `X-FLooks-User|Teams|Department|Role|Workspace` headers with `POST /api/v1/query/execute` for dashboard panel runtime requests.
-- `apps/web/src/App.tsx` updated the dataset-grant preview action copy so operators understand that previewing an access context also applies it to the live dashboard runtime.
-- `apps/web/src/App.tsx` added an `Access context` runtime snapshot card and updated the runtime section summary so the active policy context is visible while inspecting live panel output.
-
-Functional result:
-- The dataset bootstrap preview and the live dashboard panel runtime now evaluate the same principal context instead of drifting apart.
-- Changing the access context in the shell can now hide or unblock live panel execution in the same way it changes the accessible dataset list.
-- Runtime troubleshooting is clearer because the currently applied access headers are visible in the dashboard runtime summary.
-
-Validation:
-- `npm run build:web`
-
-## d58c0d1c · Surface dataset grant usage impact
-
-Intent: show what would break when a dataset grant changes by attaching live dashboard usage impact to the dataset-grant control plane and exposing it in the web grant manager.
-
-What changed:
-- `apps/api/app/domain/identity.py` added typed dataset usage summary models and extended `DatasetGrantCatalogEntry` so the grant catalog can carry impact metadata.
-- `apps/api/app/api/routes/identity.py` now scans the latest persisted dashboard document for each dashboard, indexes panel usage by dataset key, and returns `usage_summary` alongside each `catalog_datasets[]` entry from `GET /api/v1/identity/dataset-grants`.
-- `apps/api/tests/test_identity.py` now asserts zero-impact summaries for empty state and verifies that creating a persisted dashboard causes the matching dataset catalog entry to report the expected dashboard/panel usage.
-- `apps/web/src/App.tsx` and `apps/web/src/styles.css` now show the selected dataset's impact summary in the grant composer and repeat the same impact preview on persisted grant cards so delete decisions have immediate context.
-- `apps/api/app/api/routes/reference.py` and `apps/api/tests/test_system.py` now document and assert the new `catalog_datasets[].usage_summary.*` fields in the structured API reference.
-
-Functional result:
-- Operators can see how many latest persisted dashboards and panels reference a dataset before adding or removing grants.
-- Persisted grant cards now show a compact impact preview, which makes the dataset grant manager useful for change-risk assessment instead of only CRUD.
-- The usage summary is derived from stored dashboard documents, so it stays aligned with the currently persisted runtime surface without introducing another metadata table.
-
-Validation:
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_identity.py`
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
-- `npm run build:web`
-
-## 3175c928 · Route the shell and open layout editing
-
-Intent: break the mixed single-page localhost shell into route-specific surfaces and turn dashboard layout work into an explicit editor flow with drag-to-move interactions and versioned saves.
-
-What changed:
-- `apps/web/package.json` and `apps/web/src/main.tsx` now install and mount `react-router-dom`, which turns the web shell into a routed SPA instead of a hash-linked single surface.
-- `apps/web/src/App.tsx` now parses `/`, `/dashboards`, `/dashboards/{slug}`, `/dashboards/{slug}/edit`, `/grants`, and `/reference`, keeps the current dashboard slug in sync with deep-link paths, and only renders the route-appropriate shell section instead of stacking every surface on one page.
-- `apps/web/src/App.tsx` also adds a dedicated dashboard editor route that keeps a local editable dashboard document, supports pointer-based panel dragging snapped to the page grid, tracks dirty layout state, and saves the edited layout through the existing versioned `PUT /api/v1/dashboards/{slug}` flow with an explicit `Save layout` action.
-- `apps/web/src/styles.css` adds the routed-shell active nav treatment plus editor canvas drag affordances so draggable panels are visually distinct while editing.
-- `apps/api/app/api/routes/dashboards.py` now rejects dashboard documents whose page placements reference a `panelId` that does not exist in the panel library, and `apps/api/tests/test_dashboards.py` covers that editor-relevant save guard.
-- `apps/api/app/api/routes/reference.py` and `apps/api/tests/test_system.py` now note that dashboard create/update `400` responses also cover invalid placement references.
-
-Functional result:
-- `localhost:5173` no longer has to present dashboard directory, grants, reference, and runtime/editor on one long mixed surface; each is now deep-linkable as its own route.
-- Operators can open `/dashboards/{slug}/edit`, drag scorecards/tables/charts/notices to new snapped positions, reset unsaved changes, and persist the updated layout as a new dashboard version explicitly.
-- Backend saves now enforce a minimum placement-to-panel-library integrity rule, which keeps layout-editor saves from persisting orphaned panel references.
-
-Validation:
-- `npm run build:web`
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
-
-## b8743ae6 · Add layout resize handles
-
-Intent: make the routed dashboard editor useful for more than panel relocation by allowing operators to resize placed cards before saving a new dashboard version.
-
-What changed:
-- `apps/web/src/App.tsx` now extends the editor pointer state to distinguish move vs. resize interactions and keeps the origin `width`/`height` values needed to calculate snapped size updates.
-- `apps/web/src/App.tsx` now renders a bottom-right resize handle for each panel on `/dashboards/{slug}/edit`, snaps resized `width` and `height` values to the page `snapGrid`, and reuses the existing explicit `Save layout` flow without introducing autosave.
-- `apps/web/src/App.tsx` also updates the editor helper copy so operators understand that the editor now supports both moving and resizing cards before persistence.
-- `apps/web/src/styles.css` now styles resize handles and resizing state so editable cards show a distinct affordance while preserving the existing runtime canvas look.
-
-Functional result:
-- Operators can now change both the position and the footprint of scorecards, tables, charts, and notice cards from the dedicated editor route.
-- Resized panels stay constrained to the current page bounds and the saved dashboard layout continues to use the same versioned persistence path as before.
-- The editor remains explicit-save only, so the added resize interactions do not create version churn during active manipulation.
-
-Validation:
-- `npm run build:web`
-
-## a83f96fa · Add editor selection and keyboard nudging
-
-Intent: reduce mouse-only friction in the dashboard editor by making panel selection explicit and allowing fine placement adjustment from the keyboard.
-
-What changed:
-- `apps/web/src/App.tsx` now tracks the currently selected panel in `/dashboards/{slug}/edit`, initializes that selection from the active page, and clears it when the editor route is exited or the operator clicks empty canvas space.
-- `apps/web/src/App.tsx` now focuses the canvas scroller during drag/resize interactions so keyboard shortcuts apply to the editor immediately after a panel is touched.
-- `apps/web/src/App.tsx` extends the existing canvas key handler so the editor route supports `Arrow` keys for one-grid-step nudging on the selected panel and `Escape` to clear selection, while preserving the existing zoom shortcuts.
-- `apps/web/src/styles.css` now renders a visible selection outline so the active editor target is obvious before a nudge or resize is applied.
-
-Functional result:
-- Operators can now make smaller layout adjustments without dragging by repeatedly nudging the selected panel one `snapGrid` step at a time.
-- Selection state is visible and explicit, which makes the editor safer once multiple similarly sized cards are on the same page.
-- The keyboard path stays scoped to the editor route and does not alter the runtime-only dashboard view behavior.
-
-Validation:
-- `npm run build:web`
-
-## ed342abe · Validate dashboard manifest contracts
-
-Intent: move the manifest/catalog milestone into the dashboard write path so invalid panel queries are rejected when a dashboard is created or versioned instead of failing later at runtime.
-
-What changed:
-- `apps/api/app/api/routes/dashboards.py` now validates each panel query in dashboard create/update requests against the current dataset manifest registry before the document is persisted.
-- `apps/api/app/api/routes/dashboards.py` also checks panel result contracts for scorecards and tables, rejecting scorecard `valueField` values or table `columns` that are not actually returned by the panel query.
-- `apps/api/tests/test_dashboards.py` added focused contract coverage for unknown panel datasets and scorecard result fields that fall outside the selected query output.
-- `apps/api/app/api/routes/reference.py` now documents the new `400 Bad Request` cases for dashboard create/update when a saved document drifts from the governed manifest catalog.
-
-Functional result:
-- Dashboard documents can no longer be persisted with panel queries that reference unknown datasets, undeclared metrics, or result fields that the panel query never returns.
-- Manifest drift now fails at save time instead of surfacing only when the runtime eventually executes the broken panel.
-- The dashboard CRUD surface is closer to a real governed catalog because dashboard persistence is now constrained by the same dataset manifest rules that query execution uses.
-
-Validation:
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
-
-## 6f50ff9f · Harden query execution path
-
-Intent: land the first milestone-sized backend hardening batch by separating the analytics query path from the metadata ORM path in code, while keeping the current Compose runtime on the existing metadata Postgres instance because port `5432` is already occupied.
-
-What changed:
-- `apps/api/app/core/config.py` and `apps/api/app/db/session.py` now support an optional `analyticsDatabaseUrl` contract and a dedicated analytics engine path, with fallback to the existing metadata `databaseUrl` when no separate analytics database is configured.
-- `apps/api/app/query/connector.py`, `apps/api/app/query/exceptions.py`, and `apps/api/app/api/routes/query.py` now convert connector-side SQLAlchemy failures into typed API errors instead of leaking `500 Internal Server Error` from raw database exceptions.
-- `apps/api/app/api/routes/reference.py`, `apps/api/tests/test_query.py`, and `apps/api/tests/test_system.py` now document and assert the new query execution failure modes and analytics URL configuration behavior.
-- `apps/api/app/query/dev_seed.py`, `apps/api/app/main.py`, `.env.example`, and `deploy/compose/docker-compose.dev.yml` now keep the local dev bootstrap working against temporary analytics tables inside the current metadata Postgres database, which avoids opening another Postgres port while still providing real governed-query rows for the starter dashboard.
-
-Functional result:
-- The query execution path is now isolated enough to move to a separate analytics database later without rewriting the dashboard runtime or connector dispatch code.
-- Known connector/runtime failures are surfaced as typed API errors instead of collapsing into opaque 500s.
-- The current Compose stack still works under the existing `5432` constraint because starter analytics data is bootstrapped into temporary `analytics.*` tables inside the metadata database.
-- Live dashboard charts continue to render from real Postgres rows in local development even after the connector hardening changes.
-
-Validation:
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py apps/api/tests/test_system.py`
-- `docker compose -f deploy/compose/docker-compose.dev.yml run --rm --no-deps api python -c "from app.query.dev_seed import bootstrap_development_analytics_marts; bootstrap_development_analytics_marts(); print('bootstrapped')"`
-- `docker compose -f deploy/compose/docker-compose.dev.yml up --build -d api`
-- `curl -sS -X POST http://localhost:8000/api/v1/query/execute -H 'Content-Type: application/json' --data '{"datasetKey":"mart_commerce_daily","dimensions":["channel_name"],"metrics":[{"key":"revenue","aggregate":"sum"}],"sort":[{"field":"revenue","direction":"desc"}],"limit":5}' | jq '{rowCount, columnNames, sample: (.results[:3]), executionMetadata}'`
-
-## d9d02e88 · Seed development analytics marts
-
-Intent: unblock real Postgres-backed chart rendering in the Compose environment by making sure the governed query layer has actual analytics marts to execute against.
-
-What changed:
-- `apps/api/app/query/dev_seed.py` now creates `analytics.mart_commerce_daily` and `analytics.mart_channel_performance` on startup and seeds them with starter rows when the tables are empty.
-- `apps/api/app/core/config.py`, `apps/api/app/main.py`, `deploy/compose/docker-compose.dev.yml`, and `.env.example` added an opt-in `FLOOKS_BOOTSTRAP_DEV_ANALYTICS` setting so the bootstrap only runs in development environments that explicitly request it.
-- `apps/web/src/App.tsx` now keeps a latest-dashboard snapshot for historical browsing and renders a structural diff summary so operators can compare the selected historical revision against the latest persisted dashboard shape.
-
-Functional result:
-- The Compose API no longer fails with `500 Internal Server Error` when `/api/v1/query/execute` targets the starter Postgres manifests without preloaded analytics marts.
-- The local environment now returns chartable Postgres rows for the starter dashboard queries, which moves the runtime from metadata-only shell behavior to real line/bar/pie data rendering.
-- Historical revision browsing also shows whether the latest dashboard adds or removes pages, panels, or placements relative to the selected older revision.
-
-Validation:
-- `npm run build:web`
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py`
-- `docker compose -f deploy/compose/docker-compose.dev.yml up --build -d api`
-- `curl -sS -X POST http://localhost:8000/api/v1/query/execute -H 'Content-Type: application/json' --data '{"datasetKey":"mart_commerce_daily","dimensions":["channel_name"],"metrics":[{"key":"revenue","aggregate":"sum"}],"sort":[{"field":"revenue","direction":"desc"}],"limit":5}' | jq '{rowCount, columnNames, sample: (.results[:3]), executionMetadata}'`
-- `curl -s http://localhost:5173/src/App.tsx | rg "Structural diff|Latest adds:|Historical-only:" -n`
-
-## f6c3b9a1 · Compare revision context
-
-Intent: make dashboard revision context readable without forcing operators to open version history and manually infer how the currently viewed historical revision differs from the latest persisted state.
-
-What changed:
-- `apps/api/app/domain/dashboard.py`, `apps/api/app/api/routes/dashboards.py`, and `apps/api/app/api/routes/reference.py` now expose `latestVersionSummary` in dashboard summary payloads and reference docs so clients can read the latest persisted revision note from list/detail responses.
-- `apps/api/tests/test_dashboards.py` now asserts `latestVersionSummary` across create, list, and update flows so the summary contract stays aligned with the live API.
-- `apps/web/src/App.tsx` now surfaces the latest persisted revision note directly in dashboard directory cards and above the runtime preview.
-- `apps/web/src/App.tsx` also derives a historical-versus-latest comparison note from the existing selected/latest version summaries and shows that note both in version history and in the runtime revision summary when an older revision is loaded.
-
-Functional result:
-- Operators can read the latest persisted revision note directly from dashboard summaries without loading the full version history first.
-- When a historical revision is loaded, the shell now explains which version is being viewed, what the latest version status is, and what summary was recorded on the latest persisted revision.
-- The live runtime preview becomes easier to trust because historical browsing now keeps the latest persisted state visible instead of hiding it behind another click.
-
-Validation:
-- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
-- `npm run build:web`
-- `docker compose -f deploy/compose/docker-compose.dev.yml up --build -d api web`
-- `curl -s http://localhost:8000/api/v1/dashboards | jq 'map({slug, latestVersionNumber, latestVersionSummary}) | .[:3]'`
-- `curl -s http://localhost:5173/src/App.tsx | rg "Latest revision note|Viewing v.*while latest v" -n`
-
 ## 4f039b3f · Create dashboards from shell
 
 Intent: expose the existing dashboard create API in the web shell so operators can fork the currently loaded dashboard document into a brand-new persisted dashboard without leaving the homepage.
@@ -1349,6 +1108,247 @@ Functional result:
 - Operators can now create a new persisted dashboard revision directly from the live shell instead of only browsing the existing version history.
 - Historical version browsing now supports a concrete follow-up action: load an older revision, then persist it forward as the next latest revision.
 - The homepage moves one step closer to a usable dashboard service by exposing an existing backend versioning capability as an operator-facing control.
+
+Validation:
+- `npm run build:web`
+
+## f6c3b9a1 · Compare revision context
+
+Intent: make dashboard revision context readable without forcing operators to open version history and manually infer how the currently viewed historical revision differs from the latest persisted state.
+
+What changed:
+- `apps/api/app/domain/dashboard.py`, `apps/api/app/api/routes/dashboards.py`, and `apps/api/app/api/routes/reference.py` now expose `latestVersionSummary` in dashboard summary payloads and reference docs so clients can read the latest persisted revision note from list/detail responses.
+- `apps/api/tests/test_dashboards.py` now asserts `latestVersionSummary` across create, list, and update flows so the summary contract stays aligned with the live API.
+- `apps/web/src/App.tsx` now surfaces the latest persisted revision note directly in dashboard directory cards and above the runtime preview.
+- `apps/web/src/App.tsx` also derives a historical-versus-latest comparison note from the existing selected/latest version summaries and shows that note both in version history and in the runtime revision summary when an older revision is loaded.
+
+Functional result:
+- Operators can read the latest persisted revision note directly from dashboard summaries without loading the full version history first.
+- When a historical revision is loaded, the shell now explains which version is being viewed, what the latest version status is, and what summary was recorded on the latest persisted revision.
+- The live runtime preview becomes easier to trust because historical browsing now keeps the latest persisted state visible instead of hiding it behind another click.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
+- `npm run build:web`
+- `docker compose -f deploy/compose/docker-compose.dev.yml up --build -d api web`
+- `curl -s http://localhost:8000/api/v1/dashboards | jq 'map({slug, latestVersionNumber, latestVersionSummary}) | .[:3]'`
+- `curl -s http://localhost:5173/src/App.tsx | rg "Latest revision note|Viewing v.*while latest v" -n`
+
+## d9d02e88 · Seed development analytics marts
+
+Intent: unblock real Postgres-backed chart rendering in the Compose environment by making sure the governed query layer has actual analytics marts to execute against.
+
+What changed:
+- `apps/api/app/query/dev_seed.py` now creates `analytics.mart_commerce_daily` and `analytics.mart_channel_performance` on startup and seeds them with starter rows when the tables are empty.
+- `apps/api/app/core/config.py`, `apps/api/app/main.py`, `deploy/compose/docker-compose.dev.yml`, and `.env.example` added an opt-in `FLOOKS_BOOTSTRAP_DEV_ANALYTICS` setting so the bootstrap only runs in development environments that explicitly request it.
+- `apps/web/src/App.tsx` now keeps a latest-dashboard snapshot for historical browsing and renders a structural diff summary so operators can compare the selected historical revision against the latest persisted dashboard shape.
+
+Functional result:
+- The Compose API no longer fails with `500 Internal Server Error` when `/api/v1/query/execute` targets the starter Postgres manifests without preloaded analytics marts.
+- The local environment now returns chartable Postgres rows for the starter dashboard queries, which moves the runtime from metadata-only shell behavior to real line/bar/pie data rendering.
+- Historical revision browsing also shows whether the latest dashboard adds or removes pages, panels, or placements relative to the selected older revision.
+
+Validation:
+- `npm run build:web`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py`
+- `docker compose -f deploy/compose/docker-compose.dev.yml up --build -d api`
+- `curl -sS -X POST http://localhost:8000/api/v1/query/execute -H 'Content-Type: application/json' --data '{"datasetKey":"mart_commerce_daily","dimensions":["channel_name"],"metrics":[{"key":"revenue","aggregate":"sum"}],"sort":[{"field":"revenue","direction":"desc"}],"limit":5}' | jq '{rowCount, columnNames, sample: (.results[:3]), executionMetadata}'`
+- `curl -s http://localhost:5173/src/App.tsx | rg "Structural diff|Latest adds:|Historical-only:" -n`
+
+## 6f50ff9f · Harden query execution path
+
+Intent: land the first milestone-sized backend hardening batch by separating the analytics query path from the metadata ORM path in code, while keeping the current Compose runtime on the existing metadata Postgres instance because port `5432` is already occupied.
+
+What changed:
+- `apps/api/app/core/config.py` and `apps/api/app/db/session.py` now support an optional `analyticsDatabaseUrl` contract and a dedicated analytics engine path, with fallback to the existing metadata `databaseUrl` when no separate analytics database is configured.
+- `apps/api/app/query/connector.py`, `apps/api/app/query/exceptions.py`, and `apps/api/app/api/routes/query.py` now convert connector-side SQLAlchemy failures into typed API errors instead of leaking `500 Internal Server Error` from raw database exceptions.
+- `apps/api/app/api/routes/reference.py`, `apps/api/tests/test_query.py`, and `apps/api/tests/test_system.py` now document and assert the new query execution failure modes and analytics URL configuration behavior.
+- `apps/api/app/query/dev_seed.py`, `apps/api/app/main.py`, `.env.example`, and `deploy/compose/docker-compose.dev.yml` now keep the local dev bootstrap working against temporary analytics tables inside the current metadata Postgres database, which avoids opening another Postgres port while still providing real governed-query rows for the starter dashboard.
+
+Functional result:
+- The query execution path is now isolated enough to move to a separate analytics database later without rewriting the dashboard runtime or connector dispatch code.
+- Known connector/runtime failures are surfaced as typed API errors instead of collapsing into opaque 500s.
+- The current Compose stack still works under the existing `5432` constraint because starter analytics data is bootstrapped into temporary `analytics.*` tables inside the metadata database.
+- Live dashboard charts continue to render from real Postgres rows in local development even after the connector hardening changes.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py apps/api/tests/test_system.py`
+- `docker compose -f deploy/compose/docker-compose.dev.yml run --rm --no-deps api python -c "from app.query.dev_seed import bootstrap_development_analytics_marts; bootstrap_development_analytics_marts(); print('bootstrapped')"`
+- `docker compose -f deploy/compose/docker-compose.dev.yml up --build -d api`
+- `curl -sS -X POST http://localhost:8000/api/v1/query/execute -H 'Content-Type: application/json' --data '{"datasetKey":"mart_commerce_daily","dimensions":["channel_name"],"metrics":[{"key":"revenue","aggregate":"sum"}],"sort":[{"field":"revenue","direction":"desc"}],"limit":5}' | jq '{rowCount, columnNames, sample: (.results[:3]), executionMetadata}'`
+
+## ed342abe · Validate dashboard manifest contracts
+
+Intent: move the manifest/catalog milestone into the dashboard write path so invalid panel queries are rejected when a dashboard is created or versioned instead of failing later at runtime.
+
+What changed:
+- `apps/api/app/api/routes/dashboards.py` now validates each panel query in dashboard create/update requests against the current dataset manifest registry before the document is persisted.
+- `apps/api/app/api/routes/dashboards.py` also checks panel result contracts for scorecards and tables, rejecting scorecard `valueField` values or table `columns` that are not actually returned by the panel query.
+- `apps/api/tests/test_dashboards.py` added focused contract coverage for unknown panel datasets and scorecard result fields that fall outside the selected query output.
+- `apps/api/app/api/routes/reference.py` now documents the new `400 Bad Request` cases for dashboard create/update when a saved document drifts from the governed manifest catalog.
+
+Functional result:
+- Dashboard documents can no longer be persisted with panel queries that reference unknown datasets, undeclared metrics, or result fields that the panel query never returns.
+- Manifest drift now fails at save time instead of surfacing only when the runtime eventually executes the broken panel.
+- The dashboard CRUD surface is closer to a real governed catalog because dashboard persistence is now constrained by the same dataset manifest rules that query execution uses.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
+
+## 2db4c56f · Enforce dataset grants on query routes
+
+Intent: turn the existing `dataset_grant` metadata table into real governed-query visibility enforcement so dataset discovery and execution follow the hidden-resource policy instead of exposing every manifest unconditionally.
+
+What changed:
+- `apps/api/app/query/access.py` added a request-scoped dataset access context, parses `X-FLooks-User`, `X-FLooks-Teams`, `X-FLooks-Department`, `X-FLooks-Role`, and `X-FLooks-Workspace` headers, and filters dataset manifests by matching `dataset_grant` rows from the metadata database.
+- `apps/api/app/api/routes/query.py` now uses the metadata session plus the access context to filter `/api/v1/query/bootstrap` results and to validate or execute queries only against the caller's accessible dataset registry.
+- `apps/api/app/query/validator.py` now accepts an injected manifest registry so route-level access filtering can reuse the same semantic validator instead of duplicating manifest checks.
+- `apps/api/tests/test_query.py` now runs against an in-memory metadata database override and covers matching-grant bootstrap filtering plus validate/execute behavior that hides unauthorized datasets as `Unknown dataset ...`.
+- `apps/api/app/api/routes/reference.py` and `apps/api/tests/test_system.py` now document and assert the new dataset access headers plus the hidden-on-deny behavior in the structured API reference.
+
+Functional result:
+- Dataset grants now affect the live governed-query surfaces instead of existing only as metadata schema.
+- `/api/v1/query/bootstrap` hides datasets that have grant rows but do not match the current request principal context.
+- `/api/v1/query/validate` and `/api/v1/query/execute` now treat unauthorized datasets as unknown datasets, which preserves the hidden-resource behavior while keeping datasets with no grant rows public by default.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
+
+## 67ae26a1 · Add dataset grant management routes
+
+Intent: make the new dataset-grant enforcement path operational by exposing a small control-plane API, so operators can manage dataset visibility without writing directly to the metadata database.
+
+What changed:
+- `apps/api/app/domain/identity.py` added typed request and response models for dataset grant records, including the idempotent upsert payload and the list response shape.
+- `apps/api/app/api/routes/identity.py` now exposes `GET /api/v1/identity/dataset-grants`, `PUT /api/v1/identity/dataset-grants`, and `DELETE /api/v1/identity/dataset-grants/{grant_id}` on top of the existing metadata session and validates that new grants reference a known dataset manifest key.
+- `apps/api/tests/test_identity.py` added focused CRUD coverage for dataset grants, rejection of unknown dataset keys, and an integration check showing that grants created through the new route immediately affect `/api/v1/query/bootstrap` visibility.
+- `apps/api/app/api/routes/overview.py`, `apps/api/app/api/routes/reference.py`, and `apps/api/tests/test_system.py` now advertise and assert the new dataset-grant management surfaces in the live overview and structured API reference.
+
+Functional result:
+- Dataset grants can now be listed, created idempotently, and deleted through the API instead of requiring direct SQL or manual metadata edits.
+- Unknown dataset keys are rejected before they can drift into the permission table, keeping the grant control plane aligned with the current dataset manifest registry.
+- The governed-query hidden-on-deny behavior now has a usable operator-facing control plane, which makes the grant enforcement slice practical to exercise in development and future admin tooling.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_identity.py`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
+
+## 4625f555 · Add web dataset grant manager
+
+Intent: make the dataset-grant control plane usable from the live shell so operators can change governed-query visibility and immediately see the access-filtered dataset bootstrap without leaving the browser.
+
+What changed:
+- `apps/api/app/domain/identity.py`, `apps/api/app/api/routes/identity.py`, and `apps/api/tests/test_identity.py` extended the dataset-grant list response with a stable `catalog_datasets` section that exposes the known manifest catalog even when `/query/bootstrap` is hidden by grant evaluation.
+- `apps/web/src/App.tsx` now loads dataset grants and the access-filtered query bootstrap alongside the existing shell state, renders a new `Dataset Grants` panel, and lets operators preview `X-FLooks-User|Teams|Department|Role|Workspace` header contexts directly from the UI.
+- `apps/web/src/App.tsx` also added an in-shell dataset grant composer backed by `PUT /api/v1/identity/dataset-grants`, plus inline delete controls backed by `DELETE /api/v1/identity/dataset-grants/{grant_id}`.
+- `apps/web/src/styles.css` added the layout and card styling for the new dataset grant preview, grant composer, and persisted grant list.
+- `apps/api/app/api/routes/reference.py` and `apps/api/tests/test_system.py` now document and assert the catalog-bearing dataset-grant list response so the structured API reference stays aligned with the live control-plane contract.
+
+Functional result:
+- The live shell can now manage dataset grants without direct SQL, which makes the hidden-on-deny query enforcement practical to exercise from the browser.
+- Operators can preview exactly which datasets remain visible for a chosen principal context before or after saving a grant.
+- The shell now has enough catalog context to keep offering valid dataset grant targets even after all governed-query datasets are hidden by grant rules.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_identity.py`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
+- `npm run build:web`
+
+## b766c2b0 · Sync runtime with dataset access context
+
+Intent: remove the last mismatch between dataset visibility preview and live panel execution by making the dashboard runtime follow the same applied access context that the dataset-grant panel previews.
+
+What changed:
+- `apps/web/src/App.tsx` now keeps the last successfully previewed dataset access headers as applied runtime state instead of treating the preview form as informational only.
+- `apps/web/src/App.tsx` now sends those applied `X-FLooks-User|Teams|Department|Role|Workspace` headers with `POST /api/v1/query/execute` for dashboard panel runtime requests.
+- `apps/web/src/App.tsx` updated the dataset-grant preview action copy so operators understand that previewing an access context also applies it to the live dashboard runtime.
+- `apps/web/src/App.tsx` added an `Access context` runtime snapshot card and updated the runtime section summary so the active policy context is visible while inspecting live panel output.
+
+Functional result:
+- The dataset bootstrap preview and the live dashboard panel runtime now evaluate the same principal context instead of drifting apart.
+- Changing the access context in the shell can now hide or unblock live panel execution in the same way it changes the accessible dataset list.
+- Runtime troubleshooting is clearer because the currently applied access headers are visible in the dashboard runtime summary.
+
+Validation:
+- `npm run build:web`
+
+## d58c0d1c · Surface dataset grant usage impact
+
+Intent: show what would break when a dataset grant changes by attaching live dashboard usage impact to the dataset-grant control plane and exposing it in the web grant manager.
+
+What changed:
+- `apps/api/app/domain/identity.py` added typed dataset usage summary models and extended `DatasetGrantCatalogEntry` so the grant catalog can carry impact metadata.
+- `apps/api/app/api/routes/identity.py` now scans the latest persisted dashboard document for each dashboard, indexes panel usage by dataset key, and returns `usage_summary` alongside each `catalog_datasets[]` entry from `GET /api/v1/identity/dataset-grants`.
+- `apps/api/tests/test_identity.py` now asserts zero-impact summaries for empty state and verifies that creating a persisted dashboard causes the matching dataset catalog entry to report the expected dashboard/panel usage.
+- `apps/web/src/App.tsx` and `apps/web/src/styles.css` now show the selected dataset's impact summary in the grant composer and repeat the same impact preview on persisted grant cards so delete decisions have immediate context.
+- `apps/api/app/api/routes/reference.py` and `apps/api/tests/test_system.py` now document and assert the new `catalog_datasets[].usage_summary.*` fields in the structured API reference.
+
+Functional result:
+- Operators can see how many latest persisted dashboards and panels reference a dataset before adding or removing grants.
+- Persisted grant cards now show a compact impact preview, which makes the dataset grant manager useful for change-risk assessment instead of only CRUD.
+- The usage summary is derived from stored dashboard documents, so it stays aligned with the currently persisted runtime surface without introducing another metadata table.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_identity.py`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
+- `npm run build:web`
+
+## 3175c928 · Route the shell and open layout editing
+
+Intent: break the mixed single-page localhost shell into route-specific surfaces and turn dashboard layout work into an explicit editor flow with drag-to-move interactions and versioned saves.
+
+What changed:
+- `apps/web/package.json` and `apps/web/src/main.tsx` now install and mount `react-router-dom`, which turns the web shell into a routed SPA instead of a hash-linked single surface.
+- `apps/web/src/App.tsx` now parses `/`, `/dashboards`, `/dashboards/{slug}`, `/dashboards/{slug}/edit`, `/grants`, and `/reference`, keeps the current dashboard slug in sync with deep-link paths, and only renders the route-appropriate shell section instead of stacking every surface on one page.
+- `apps/web/src/App.tsx` also adds a dedicated dashboard editor route that keeps a local editable dashboard document, supports pointer-based panel dragging snapped to the page grid, tracks dirty layout state, and saves the edited layout through the existing versioned `PUT /api/v1/dashboards/{slug}` flow with an explicit `Save layout` action.
+- `apps/web/src/styles.css` adds the routed-shell active nav treatment plus editor canvas drag affordances so draggable panels are visually distinct while editing.
+- `apps/api/app/api/routes/dashboards.py` now rejects dashboard documents whose page placements reference a `panelId` that does not exist in the panel library, and `apps/api/tests/test_dashboards.py` covers that editor-relevant save guard.
+- `apps/api/app/api/routes/reference.py` and `apps/api/tests/test_system.py` now note that dashboard create/update `400` responses also cover invalid placement references.
+
+Functional result:
+- `localhost:5173` no longer has to present dashboard directory, grants, reference, and runtime/editor on one long mixed surface; each is now deep-linkable as its own route.
+- Operators can open `/dashboards/{slug}/edit`, drag scorecards/tables/charts/notices to new snapped positions, reset unsaved changes, and persist the updated layout as a new dashboard version explicitly.
+- Backend saves now enforce a minimum placement-to-panel-library integrity rule, which keeps layout-editor saves from persisting orphaned panel references.
+
+Validation:
+- `npm run build:web`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
+
+## b8743ae6 · Add layout resize handles
+
+Intent: make the routed dashboard editor useful for more than panel relocation by allowing operators to resize placed cards before saving a new dashboard version.
+
+What changed:
+- `apps/web/src/App.tsx` now extends the editor pointer state to distinguish move vs. resize interactions and keeps the origin `width`/`height` values needed to calculate snapped size updates.
+- `apps/web/src/App.tsx` now renders a bottom-right resize handle for each panel on `/dashboards/{slug}/edit`, snaps resized `width` and `height` values to the page `snapGrid`, and reuses the existing explicit `Save layout` flow without introducing autosave.
+- `apps/web/src/App.tsx` also updates the editor helper copy so operators understand that the editor now supports both moving and resizing cards before persistence.
+- `apps/web/src/styles.css` now styles resize handles and resizing state so editable cards show a distinct affordance while preserving the existing runtime canvas look.
+
+Functional result:
+- Operators can now change both the position and the footprint of scorecards, tables, charts, and notice cards from the dedicated editor route.
+- Resized panels stay constrained to the current page bounds and the saved dashboard layout continues to use the same versioned persistence path as before.
+- The editor remains explicit-save only, so the added resize interactions do not create version churn during active manipulation.
+
+Validation:
+- `npm run build:web`
+
+## a83f96fa · Add editor selection and keyboard nudging
+
+Intent: reduce mouse-only friction in the dashboard editor by making panel selection explicit and allowing fine placement adjustment from the keyboard.
+
+What changed:
+- `apps/web/src/App.tsx` now tracks the currently selected panel in `/dashboards/{slug}/edit`, initializes that selection from the active page, and clears it when the editor route is exited or the operator clicks empty canvas space.
+- `apps/web/src/App.tsx` now focuses the canvas scroller during drag/resize interactions so keyboard shortcuts apply to the editor immediately after a panel is touched.
+- `apps/web/src/App.tsx` extends the existing canvas key handler so the editor route supports `Arrow` keys for one-grid-step nudging on the selected panel and `Escape` to clear selection, while preserving the existing zoom shortcuts.
+- `apps/web/src/styles.css` now renders a visible selection outline so the active editor target is obvious before a nudge or resize is applied.
+
+Functional result:
+- Operators can now make smaller layout adjustments without dragging by repeatedly nudging the selected panel one `snapGrid` step at a time.
+- Selection state is visible and explicit, which makes the editor safer once multiple similarly sized cards are on the same page.
+- The keyboard path stays scoped to the editor route and does not alter the runtime-only dashboard view behavior.
 
 Validation:
 - `npm run build:web`
