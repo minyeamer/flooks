@@ -275,6 +275,24 @@ Functional result:
 Validation:
 - `npm run build:web`
 
+## 66f5c89f · Dashboard-like runtime canvas
+
+Intent: make the active dashboard page preview feel closer to a stored dashboard canvas instead of only showing positioned cards on a neutral grid.
+
+What changed:
+- `apps/web/src/App.tsx` added canvas metadata and sizing helpers that derive a readable preview height and canvas label from the active page dimensions plus its `snapGrid`.
+- `apps/web/src/App.tsx` now wraps the runtime preview in a dedicated canvas frame and surfaces page-level metadata such as the original canvas size, snap dimensions, and cell count above the rendered panels.
+- `apps/web/src/styles.css` added a framed canvas surface with gradients, grid lines, and stronger panel chrome so the runtime preview reads more like an actual dashboard page.
+- `apps/web/src/styles.css` also keeps the mobile breakpoint safe by overriding the canvas aspect-ratio and collapsing the preview back to a one-column stack on smaller screens.
+
+Functional result:
+- The web shell now presents the active dashboard page as a clearer page-like canvas instead of a plain card list.
+- Stored page dimensions and grid structure are visible in the runtime preview, which makes layout inspection easier during bootstrap work.
+- Mobile behavior stays readable because the preview still abandons the desktop canvas layout below the responsive breakpoint.
+
+Validation:
+- `npm run build:web`
+
 ## e2a32c51 · Layout-aware runtime preview
 
 Intent: make the active dashboard page preview reflect stored placement coordinates more directly instead of only showing panels in placement order.
