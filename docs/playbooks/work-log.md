@@ -331,6 +331,25 @@ Functional result:
 Validation:
 - `npm run build:web`
 
+## 4ca9c5db · Add dashboard lifecycle shortcuts
+
+Intent: expose publish and archive flows in the web shell so operators can move a dashboard through softer lifecycle states without manually editing the revision form each time.
+
+What changed:
+- `apps/web/src/App.tsx` refactored the existing revision-save path into a reusable helper that accepts status and summary overrides while preserving the current dashboard document payload.
+- `apps/web/src/App.tsx` now derives disabled/title states for quick publish and archive actions based on the currently loaded revision and the latest persisted status.
+- `apps/web/src/App.tsx` added `Publish as latest` and `Archive as latest` shortcut buttons to the revision composer so operators can create a new latest version in one click while still keeping the manual status selector for custom saves.
+- `apps/web/src/App.tsx` now reports clearer success notices for published and archived revisions instead of treating every save as a generic version advance.
+
+Functional result:
+- Operators can now promote or retire dashboards from the live shell without manually re-entering the same status transitions through the generic revision form.
+- Historical revision browsing now supports a concrete lifecycle workflow: load an older revision, then publish or archive it forward as the new latest revision.
+- The dashboard directory lifecycle surface now covers create, revise, publish, archive, and delete flows from one homepage section.
+
+Validation:
+- `npm run build:web`
+- `POST /api/v1/dashboards` with a temporary clone of `commerce-home`, followed by `PUT /api/v1/dashboards/{slug}` to create `published` and `archived` revisions and a final status check showing `v1:draft, v2:published, v3:archived`
+
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
