@@ -106,6 +106,31 @@ async def get_dashboard(
     return _load_dashboard_response(session, slug, version)
 
 
+@router.post(
+    "/dashboards/{slug}/refresh-starter",
+    response_model=DashboardResponse,
+    summary="Refresh starter dashboard",
+)
+async def refresh_starter_dashboard(
+    slug: str,
+    session: Session = Depends(get_db_session),
+) -> DashboardResponse:
+    _mark_dashboard_store_initialized(session)
+
+    if slug != STARTER_DASHBOARD_SLUG:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "field": "slug",
+                "message": f"Starter refresh is only supported for dashboard '{STARTER_DASHBOARD_SLUG}'.",
+            },
+        )
+
+    _seed_or_refresh_starter_dashboard(session)
+
+    return _load_dashboard_response(session, slug)
+
+
 @router.put(
     "/dashboards/{slug}",
     response_model=DashboardResponse,
@@ -266,11 +291,7 @@ def _ensure_starter_dashboard_seeded(session: Session, slug: str | None = None) 
     if slug is not None and slug != STARTER_DASHBOARD_SLUG:
         return
 
-    starter_record = session.scalar(
-        select(DashboardRecord)
-        .options(selectinload(DashboardRecord.versions))
-        .where(DashboardRecord.slug == STARTER_DASHBOARD_SLUG)
-    )
+    starter_record = _get_starter_dashboard_record(session)
 
     if starter_record is not None:
         if _should_refresh_starter_dashboard(starter_record):
@@ -288,6 +309,23 @@ def _ensure_starter_dashboard_seeded(session: Session, slug: str | None = None) 
     if bind in _SEEDED_DASHBOARD_BINDS:
         return
 
+    _create_starter_dashboard(session)
+    _SEEDED_DASHBOARD_BINDS.add(bind)
+
+
+def _mark_dashboard_store_initialized(session: Session) -> None:
+    _SEEDED_DASHBOARD_BINDS.add(session.get_bind())
+
+
+def _get_starter_dashboard_record(session: Session) -> DashboardRecord | None:
+    return session.scalar(
+        select(DashboardRecord)
+        .options(selectinload(DashboardRecord.versions))
+        .where(DashboardRecord.slug == STARTER_DASHBOARD_SLUG)
+    )
+
+
+def _create_starter_dashboard(session: Session) -> None:
     starter_document = build_starter_dashboard_document()
     starter_version = DashboardVersionRecord(
         version_number=1,
@@ -308,24 +346,49 @@ def _ensure_starter_dashboard_seeded(session: Session, slug: str | None = None) 
 
     session.add(starter_record)
     session.commit()
-    _SEEDED_DASHBOARD_BINDS.add(bind)
 
 
-def _mark_dashboard_store_initialized(session: Session) -> None:
-    _SEEDED_DASHBOARD_BINDS.add(session.get_bind())
+def _seed_or_refresh_starter_dashboard(session: Session) -> None:
+    starter_record = _get_starter_dashboard_record(session)
+
+    if starter_record is None:
+        _create_starter_dashboard(session)
+        return
+
+    if not _is_auto_managed_starter_dashboard(starter_record):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "field": "slug",
+                "message": f"Starter dashboard '{STARTER_DASHBOARD_SLUG}' is user-managed and cannot be refreshed from the canonical seed.",
+            },
+        )
+
+    if _should_refresh_starter_dashboard(starter_record):
+        _refresh_starter_dashboard(session, starter_record)
 
 
 def _should_refresh_starter_dashboard(dashboard_record: DashboardRecord) -> bool:
-    versions = _sorted_versions(dashboard_record)
-
-    if not versions or not all(_is_auto_managed_starter_version(version) for version in versions):
+    if not _is_auto_managed_starter_dashboard(dashboard_record):
         return False
 
+    versions = _sorted_versions(dashboard_record)
     latest_version = versions[-1]
     current_document = _parse_dashboard_document(latest_version)
     expected_document = build_starter_dashboard_document(version=latest_version.version_number)
 
     return current_document != expected_document
+
+
+def _is_auto_managed_starter_dashboard(dashboard_record: DashboardRecord) -> bool:
+    versions = _sorted_versions(dashboard_record)
+
+    return (
+        len(versions) > 0
+        and dashboard_record.owner_principal_kind == PrincipalKind.USER
+        and dashboard_record.owner_principal_key == _STARTER_DASHBOARD_CREATED_BY
+        and all(_is_auto_managed_starter_version(version) for version in versions)
+    )
 
 
 def _is_auto_managed_starter_version(version_record: DashboardVersionRecord) -> bool:

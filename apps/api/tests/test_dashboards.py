@@ -266,6 +266,70 @@ def test_dashboard_get_does_not_refresh_user_managed_legacy_starter_dashboard(
     assert body["versions"][0]["createdBy"] == "owner-1"
 
 
+def test_refresh_starter_dashboard_seeds_starter_when_missing_from_initialized_store(
+    dashboard_client: TestClient,
+) -> None:
+    create_response = dashboard_client.post(
+        "/api/v1/dashboards",
+        json={
+            "slug": "sales-home",
+            "description": "Secondary dashboard.",
+            "ownerPrincipalKind": "user",
+            "ownerPrincipalKey": "owner-1",
+            "createdBy": "owner-1",
+            "summary": "Initial sales dashboard.",
+            "document": _build_dashboard_document(version=1, title="Sales Home", key="sales-home"),
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    response = dashboard_client.post(f"/api/v1/dashboards/{STARTER_DASHBOARD_SLUG}/refresh-starter")
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["slug"] == STARTER_DASHBOARD_SLUG
+    assert body["latestVersionNumber"] == 1
+    assert body["document"]["panelLibrary"][6]["title"] == "Operations Notice"
+
+    list_response = dashboard_client.get("/api/v1/dashboards")
+
+    assert list_response.status_code == 200
+    assert sorted(entry["slug"] for entry in list_response.json()) == [STARTER_DASHBOARD_SLUG, "sales-home"]
+
+
+def test_refresh_starter_dashboard_rejects_user_managed_starter(
+    dashboard_client: TestClient,
+) -> None:
+    create_response = dashboard_client.post(
+        "/api/v1/dashboards",
+        json={
+            "slug": STARTER_DASHBOARD_SLUG,
+            "description": "User-owned starter dashboard.",
+            "ownerPrincipalKind": "user",
+            "ownerPrincipalKey": "owner-1",
+            "createdBy": "owner-1",
+            "summary": "Initial custom starter version.",
+            "document": _build_legacy_dashboard_document(
+                version=1,
+                title="Commerce Executive Overview",
+                key=STARTER_DASHBOARD_SLUG,
+            ),
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    response = dashboard_client.post(f"/api/v1/dashboards/{STARTER_DASHBOARD_SLUG}/refresh-starter")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == {
+        "field": "slug",
+        "message": "Starter dashboard 'commerce-home' is user-managed and cannot be refreshed from the canonical seed.",
+    }
+
+
 def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key: str = "commerce-home") -> dict[str, object]:
     return {
         "id": "db-home",

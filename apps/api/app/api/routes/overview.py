@@ -89,8 +89,8 @@ async def get_overview() -> OverviewResponse:
             ),
             OverviewMetric(
                 label="Live endpoints",
-                value="15",
-                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, query execution, dashboard list/create/detail/update/delete, overview, API reference, and OpenAPI docs are now runnable surfaces.",
+                value="16",
+                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, query execution, dashboard list/create/detail/starter refresh/update/delete, overview, API reference, and OpenAPI docs are now runnable surfaces.",
             ),
         ],
         execution_plan=[
@@ -162,6 +162,11 @@ async def get_overview() -> OverviewResponse:
                 label="Dashboards",
                 href=f"{api_prefix}/dashboards",
                 description="Dashboard CRUD collection endpoint for versioned dashboard documents.",
+            ),
+            ServiceLink(
+                label="Starter Refresh",
+                href=f"{api_prefix}/dashboards/commerce-home/refresh-starter",
+                description="Explicitly create or refresh the canonical starter dashboard seed when the environment still uses the bootstrap-managed starter.",
             ),
             ServiceLink(
                 label="Query Bootstrap",

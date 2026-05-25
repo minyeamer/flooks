@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.core.config import settings
+from app.domain.dashboard import build_starter_dashboard_document
 from app.domain.reference import (
     ApiEndpointReference,
     ApiFieldReference,
@@ -23,43 +24,7 @@ router = APIRouter(tags=["reference"])
 )
 async def get_api_reference() -> ApiReferenceResponse:
     api_prefix = settings.api_v1_prefix
-    dashboard_document_example = {
-        "id": "db-home",
-        "key": "commerce-home",
-        "title": "Commerce Executive Overview",
-        "version": 1,
-        "ownerRoleBoundary": "ADMIN",
-        "supportedDataSources": ["POSTGRES"],
-        "pages": [
-            {
-                "id": "page-overview",
-                "title": "Overview",
-                "width": 1600,
-                "height": 900,
-                "snapGrid": {"columnWidth": 20, "rowHeight": 20},
-                "placements": [
-                    {
-                        "panelId": "panel-gmv",
-                        "x": 40,
-                        "y": 40,
-                        "width": 300,
-                        "height": 180,
-                        "zIndex": 1,
-                    }
-                ],
-            }
-        ],
-        "panelLibrary": [
-            {
-                "id": "panel-gmv",
-                "key": "gmv-scorecard",
-                "kind": "scorecard",
-                "title": "GMV",
-                "datasetKey": "mart_commerce_daily",
-                "byReference": True,
-            }
-        ],
-    }
+    dashboard_document_example = build_starter_dashboard_document().model_dump(mode="json", by_alias=True)
     dashboard_version_fields = [
         ApiFieldReference(name="versions[].versionNumber", type="integer", description="저장된 dashboard document revision 번호입니다."),
         ApiFieldReference(name="versions[].status", type="string", description="revision 상태입니다.", enum_values=["draft", "published", "archived"]),
@@ -365,6 +330,45 @@ async def get_api_reference() -> ApiReferenceResponse:
                     ),
                 ],
                 openapi_href="/docs#/dashboards/update_dashboard_api_v1_dashboards__slug__put",
+            ),
+            ApiEndpointReference(
+                id="dashboards-refresh-starter",
+                method="POST",
+                path=f"{api_prefix}/dashboards/{{slug}}/refresh-starter",
+                summary="Refresh starter dashboard",
+                description="starter slug에 대해서만 canonical starter dashboard document를 명시적으로 생성하거나 새 seed로 refresh합니다. user-managed starter dashboard는 보호를 위해 refresh를 거부합니다.",
+                parameters=[
+                    ApiFieldReference(name="slug", type="path string", description="refresh 대상 starter dashboard slug입니다. 현재는 `commerce-home`만 허용됩니다.", example="commerce-home"),
+                ],
+                responses=[
+                    ApiResponseReference(
+                        status_code=200,
+                        description="starter dashboard가 생성되거나 refresh된 뒤 최신 dashboard detail을 반환합니다. 이미 최신 canonical seed면 현재 상태를 그대로 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="latestVersionNumber", type="integer", description="seed 생성 또는 refresh 이후의 최신 revision 번호입니다."),
+                            ApiFieldReference(name="latestVersionStatus", type="string", description="starter dashboard 최신 revision 상태입니다.", enum_values=["draft", "published", "archived"]),
+                            ApiFieldReference(name="document", type="object", description="starter dashboard의 현재 canonical document입니다.", example=dashboard_document_example),
+                            *dashboard_version_fields,
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=400,
+                        description="starter slug가 아니면 bad request를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패한 입력 필드입니다.", example="slug"),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 설명입니다."),
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=409,
+                        description="starter dashboard가 이미 user-managed 상태면 canonical seed refresh를 거부합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="충돌이 발생한 입력 필드입니다.", example="slug"),
+                            ApiFieldReference(name="detail.message", type="string", description="충돌 설명입니다."),
+                        ],
+                    ),
+                ],
+                openapi_href="/docs#/dashboards/refresh_starter_dashboard_api_v1_dashboards__slug__refresh_starter_post",
             ),
             ApiEndpointReference(
                 id="dashboards-delete",
