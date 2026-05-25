@@ -993,10 +993,10 @@ function App() {
       const historySummary = getStarterRefreshHistorySummary(historyActionKind);
       const historyDetail =
         previousPersistedVersion == null
-          ? `Persisted the canonical starter as version ${payload.latestVersionNumber}.`
+          ? `Persisted as v${payload.latestVersionNumber}.`
           : payload.latestVersionNumber > previousPersistedVersion
-            ? `Advanced the persisted starter from version ${previousPersistedVersion} to ${payload.latestVersionNumber}.`
-            : `No new version was needed; the persisted starter stayed at version ${payload.latestVersionNumber}.`;
+            ? `Advanced v${previousPersistedVersion} -> v${payload.latestVersionNumber}.`
+            : `No version change; stayed at v${payload.latestVersionNumber}.`;
 
       setDashboardNotice(
         previousPersistedVersion == null
