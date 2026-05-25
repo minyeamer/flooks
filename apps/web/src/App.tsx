@@ -156,6 +156,7 @@ type StarterRefreshHistoryEntry = {
   detail: string;
   rawDetail: string | null;
   timestampLabel: string;
+  timestampMs: number | null;
   tone: StarterRefreshHistoryTone;
   actionKind: StarterRefreshHistoryKind | null;
   contextLabels: string[];
@@ -186,6 +187,10 @@ const numberFormatter = new Intl.NumberFormat('en-US');
 const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
   dateStyle: 'medium',
   timeStyle: 'short',
+});
+const relativeTimeFormatter = new Intl.RelativeTimeFormat('en-US', {
+  numeric: 'auto',
+  style: 'short',
 });
 
 const runtimeCanvasScaleModes: Array<{
@@ -237,6 +242,25 @@ function inferStarterRefreshHistoryKind(
   }
 
   return null;
+}
+
+function formatRelativeTimeLabel(timestampMs: number, referenceTimestampMs = Date.now()): string {
+  const offsetMs = timestampMs - referenceTimestampMs;
+  const absoluteOffsetMs = Math.abs(offsetMs);
+
+  if (absoluteOffsetMs < 60_000) {
+    return relativeTimeFormatter.format(Math.round(offsetMs / 1000), 'second');
+  }
+
+  if (absoluteOffsetMs < 3_600_000) {
+    return relativeTimeFormatter.format(Math.round(offsetMs / 60_000), 'minute');
+  }
+
+  if (absoluteOffsetMs < 86_400_000) {
+    return relativeTimeFormatter.format(Math.round(offsetMs / 3_600_000), 'hour');
+  }
+
+  return relativeTimeFormatter.format(Math.round(offsetMs / 86_400_000), 'day');
 }
 
 function getStarterRefreshHistorySummary(actionKind: StarterRefreshHistoryKind): string {
@@ -379,6 +403,14 @@ function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
                 : entry.tone === 'error'
                   ? entry.detail
                   : null;
+          const rawTimestampMs = 'timestampMs' in entry ? entry.timestampMs : undefined;
+          const inferredTimestampMs = Number.parseInt(entry.id.split('-')[0] ?? '', 10);
+          const timestampMs =
+            typeof rawTimestampMs === 'number' && Number.isFinite(rawTimestampMs) && rawTimestampMs > 0
+              ? rawTimestampMs
+              : Number.isFinite(inferredTimestampMs) && inferredTimestampMs > 0
+                ? inferredTimestampMs
+                : null;
           const actionKind =
             'actionKind' in entry &&
             (entry.actionKind === 'created' ||
@@ -398,6 +430,7 @@ function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
                   : entry.detail,
               rawDetail,
               timestampLabel: entry.timestampLabel,
+              timestampMs,
               tone: entry.tone,
               actionKind,
               contextLabels,
@@ -990,15 +1023,17 @@ function App() {
     contextLabels: string[] = [],
     rawDetail: string | null = null,
   ): void {
-    const timestampLabel = dateTimeFormatter.format(new Date());
+    const timestampMs = Date.now();
+    const timestampLabel = dateTimeFormatter.format(new Date(timestampMs));
 
     setStarterRefreshHistory((currentHistory) => [
       {
-        id: `${Date.now()}-${currentHistory.length}`,
+        id: `${timestampMs}-${currentHistory.length}`,
         summary,
         detail,
         rawDetail,
         timestampLabel,
+        timestampMs,
         tone,
         actionKind,
         contextLabels: contextLabels.slice(0, 3),
@@ -1507,10 +1542,17 @@ function App() {
     starterRefreshHistoryFilter,
   );
   const activeStarterRefreshHistoryCount = visibleStarterRefreshHistory.length;
-  const latestVisibleStarterRefreshHistoryTimestampLabel =
-    visibleStarterRefreshHistory[0]?.timestampLabel ?? null;
-  const latestFailedStarterRefreshHistoryTimestampLabel =
-    starterRefreshHistory.find((entry) => entry.actionKind === 'failed')?.timestampLabel ?? null;
+  const latestVisibleStarterRefreshHistoryEntry = visibleStarterRefreshHistory[0] ?? null;
+  const latestVisibleStarterRefreshHistoryRelativeLabel =
+    latestVisibleStarterRefreshHistoryEntry?.timestampMs != null
+      ? formatRelativeTimeLabel(latestVisibleStarterRefreshHistoryEntry.timestampMs)
+      : null;
+  const latestFailedStarterRefreshHistoryEntry =
+    starterRefreshHistory.find((entry) => entry.actionKind === 'failed') ?? null;
+  const latestFailedStarterRefreshHistoryRelativeLabel =
+    latestFailedStarterRefreshHistoryEntry?.timestampMs != null
+      ? formatRelativeTimeLabel(latestFailedStarterRefreshHistoryEntry.timestampMs)
+      : null;
   const openVisibleStarterRefreshHistoryErrorsCount = visibleStarterRefreshHistory.filter(
     (entry) => entry.rawDetail != null && openStarterRefreshHistoryErrors.includes(entry.id),
   ).length;
@@ -1876,14 +1918,24 @@ function App() {
                             {activeStarterRefreshHistoryCount} item
                             {activeStarterRefreshHistoryCount === 1 ? '' : 's'}
                           </span>
-                          {latestVisibleStarterRefreshHistoryTimestampLabel ? (
-                            <span className="runtimeStarterHistorySummaryBadge">
-                              Latest {latestVisibleStarterRefreshHistoryTimestampLabel}
+                          {latestVisibleStarterRefreshHistoryEntry ? (
+                            <span
+                              className="runtimeStarterHistorySummaryBadge"
+                              title={latestVisibleStarterRefreshHistoryEntry.timestampLabel}
+                            >
+                              Latest{' '}
+                              {latestVisibleStarterRefreshHistoryRelativeLabel ??
+                                latestVisibleStarterRefreshHistoryEntry.timestampLabel}
                             </span>
                           ) : null}
-                          {latestFailedStarterRefreshHistoryTimestampLabel ? (
-                            <span className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert">
-                              Latest failure {latestFailedStarterRefreshHistoryTimestampLabel}
+                          {latestFailedStarterRefreshHistoryEntry ? (
+                            <span
+                              className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert"
+                              title={latestFailedStarterRefreshHistoryEntry.timestampLabel}
+                            >
+                              Latest failure{' '}
+                              {latestFailedStarterRefreshHistoryRelativeLabel ??
+                                latestFailedStarterRefreshHistoryEntry.timestampLabel}
                             </span>
                           ) : null}
                           {openVisibleStarterRefreshHistoryErrorsCount > 0 ? (
