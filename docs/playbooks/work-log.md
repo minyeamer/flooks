@@ -294,6 +294,25 @@ Validation:
 - `npm run build:web`
 - `POST /api/v1/dashboards` with a temporary clone of `commerce-home`, followed by `GET /api/v1/dashboards/commerce-home-live-copy` and `DELETE /api/v1/dashboards/commerce-home-live-copy`
 
+## 5f1c6962 · Delete dashboards from shell
+
+Intent: expose the existing dashboard delete API in the web shell so operators can clean up non-starter dashboards without leaving the homepage.
+
+What changed:
+- `apps/web/src/App.tsx` now keeps shell-local delete state for two-click confirmation and in-flight request tracking alongside the existing dashboard directory state.
+- `apps/web/src/App.tsx` added a `Delete selected dashboard` card to the dashboard directory that targets the currently selected slug, disallows the canonical starter dashboard, and auto-disarms the confirmation state after the existing 4-second timeout window.
+- `apps/web/src/App.tsx` now calls `DELETE /api/v1/dashboards/{slug}` for the selected non-starter dashboard, prunes the deleted slug from the local directory state, resets the selected version, and falls back to another available dashboard or the starter seed.
+- `apps/web/src/App.tsx` refreshes the dashboard directory after a successful delete so the live shell stays aligned with metadata-store state.
+
+Functional result:
+- Operators can now remove persisted non-starter dashboards directly from the live shell instead of switching to raw API calls.
+- The dashboard directory now covers create, browse, revise, and delete lifecycle actions from one surface.
+- The starter dashboard remains protected in the shell so the canonical seed cannot be removed accidentally through the main homepage flow.
+
+Validation:
+- `npm run build:web`
+- `POST /api/v1/dashboards` with a temporary clone of `commerce-home`, followed by `DELETE /api/v1/dashboards/commerce-home-delete-...` and a `404` check on `GET /api/v1/dashboards/{slug}`
+
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
