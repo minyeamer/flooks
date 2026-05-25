@@ -821,3 +821,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## f98d3827 · Persist raw error disclosures
+
+Intent: keep failure-triage context stable across browser reloads by remembering which starter history raw-error disclosures the operator had already expanded in the current browser session.
+
+What changed:
+- `apps/web/src/App.tsx` added a session-storage key, loader, and saver for the set of expanded starter history raw-error disclosures.
+- `apps/web/src/App.tsx` now controls each failed-entry raw-error disclosure through local state, persists that open-state list into browser session storage, and restores it on mount.
+- `apps/web/src/App.tsx` also prunes stale open disclosure IDs whenever the recent starter history changes so removed or rotated-out entries do not leave dead state behind.
+
+Functional result:
+- Operators can reload the shell and return to the same expanded raw-error disclosures for the current browser session.
+- Failure triage stays anchored to the same recent entries without forcing the operator to reopen every raw error after each refresh.
+- Stale persisted disclosure state is cleaned up automatically when the underlying starter history entries disappear.
+
+Validation:
+- `npm run build:web`
