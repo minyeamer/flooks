@@ -98,6 +98,7 @@ type DashboardApiResponse = {
   slug: string;
   title: string;
   description: string | null;
+  ownerPrincipalKind: DashboardOwnerPrincipalKind;
   latestVersionNumber: number;
   latestVersionStatus: 'draft' | 'published' | 'archived';
   ownerPrincipalKey: string;
@@ -111,11 +112,14 @@ type DashboardSummaryResponse = {
   slug: string;
   title: string;
   description: string | null;
+  ownerPrincipalKind: DashboardOwnerPrincipalKind;
   ownerPrincipalKey: string;
   latestVersionNumber: number;
   latestVersionStatus: 'draft' | 'published' | 'archived';
   updatedAt: string;
 };
+
+type DashboardOwnerPrincipalKind = 'user' | 'team' | 'department' | 'role' | 'workspace';
 
 type DashboardVersionSummaryResponse = {
   versionNumber: number;
@@ -239,11 +243,50 @@ const runtimeCanvasZoomPercentMin = 85;
 const runtimeCanvasZoomPercentMax = 170;
 const clearStarterHistoryConfirmTimeoutMs = 4000;
 const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f'] as const;
+const dashboardOwnerPrincipalKinds: DashboardOwnerPrincipalKind[] = [
+  'user',
+  'team',
+  'department',
+  'role',
+  'workspace',
+];
 const dashboardVersionStatuses: DashboardVersionStatus[] = ['draft', 'published', 'archived'];
 const starterDashboardBootstrapOwnerKey = 'system-bootstrap';
 const starterRefreshHistoryStorageKey = 'flooks.starter-refresh-history';
 const starterRefreshHistoryFilterStorageKey = 'flooks.starter-refresh-history-filter';
 const starterRefreshHistoryOpenErrorsStorageKey = 'flooks.starter-refresh-history-open-errors';
+
+function normalizeDashboardSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function buildDashboardDocumentId(slug: string): string {
+  return slug.startsWith('db-') ? slug : `db-${slug}`;
+}
+
+function getSuggestedDashboardSlug(baseSlug: string): string {
+  const normalizedBaseSlug = normalizeDashboardSlug(baseSlug);
+
+  if (normalizedBaseSlug.length === 0) {
+    return 'new-dashboard';
+  }
+
+  return normalizedBaseSlug.endsWith('-copy') ? `${normalizedBaseSlug}-2` : `${normalizedBaseSlug}-copy`;
+}
+
+function getSuggestedDashboardTitle(baseTitle: string): string {
+  const trimmedTitle = baseTitle.trim();
+
+  if (trimmedTitle.length === 0) {
+    return 'New Dashboard';
+  }
+
+  return trimmedTitle.endsWith('Copy') ? `${trimmedTitle} 2` : `${trimmedTitle} Copy`;
+}
 
 function inferStarterRefreshHistoryKind(
   summary: string,
@@ -1004,6 +1047,21 @@ function App() {
     null,
   );
   const [dashboardOwnerPrincipalKey, setDashboardOwnerPrincipalKey] = useState<string | null>(null);
+  const [dashboardCreateDraftSlug, setDashboardCreateDraftSlug] = useState<string>(
+    getSuggestedDashboardSlug(starterDashboard.key),
+  );
+  const [dashboardCreateDraftTitle, setDashboardCreateDraftTitle] = useState<string>(
+    getSuggestedDashboardTitle(starterDashboard.title),
+  );
+  const [dashboardCreateDraftDescription, setDashboardCreateDraftDescription] = useState<string>('');
+  const [dashboardCreateDraftOwnerKind, setDashboardCreateDraftOwnerKind] =
+    useState<DashboardOwnerPrincipalKind>('user');
+  const [dashboardCreateDraftOwnerKey, setDashboardCreateDraftOwnerKey] = useState<string>('web-shell');
+  const [dashboardCreateDraftCreatedBy, setDashboardCreateDraftCreatedBy] = useState<string>('web-shell');
+  const [dashboardCreateDraftSummary, setDashboardCreateDraftSummary] = useState<string>('');
+  const [dashboardCreateDraftStatus, setDashboardCreateDraftStatus] =
+    useState<DashboardVersionStatus>('draft');
+  const [isCreatingDashboard, setIsCreatingDashboard] = useState<boolean>(false);
   const [dashboardVersionDraftCreatedBy, setDashboardVersionDraftCreatedBy] = useState<string>('web-shell');
   const [dashboardVersionDraftSummary, setDashboardVersionDraftSummary] = useState<string>('');
   const [dashboardVersionDraftDescription, setDashboardVersionDraftDescription] = useState<string>('');
@@ -1049,6 +1107,16 @@ function App() {
     setPersistedDashboardUpdatedAt(payload.updatedAt);
     setPersistedDashboardVersionStatus(payload.latestVersionStatus);
     setDashboardOwnerPrincipalKey(payload.ownerPrincipalKey);
+    setDashboardCreateDraftSlug(getSuggestedDashboardSlug(payload.slug));
+    setDashboardCreateDraftTitle(getSuggestedDashboardTitle(payload.document.title));
+    setDashboardCreateDraftDescription(payload.description ?? '');
+    setDashboardCreateDraftOwnerKind(payload.ownerPrincipalKind);
+    setDashboardCreateDraftOwnerKey(payload.ownerPrincipalKey);
+    setDashboardCreateDraftCreatedBy((currentValue) =>
+      currentValue.trim().length > 0 ? currentValue : payload.ownerPrincipalKey,
+    );
+    setDashboardCreateDraftSummary('');
+    setDashboardCreateDraftStatus(viewedVersionSummary?.status ?? payload.latestVersionStatus);
     setDashboardVersionDraftCreatedBy((currentValue) =>
       currentValue.trim().length > 0 ? currentValue : payload.ownerPrincipalKey,
     );
@@ -1065,6 +1133,14 @@ function App() {
     setPersistedDashboardUpdatedAt(null);
     setPersistedDashboardVersionStatus(null);
     setDashboardOwnerPrincipalKey(null);
+    setDashboardCreateDraftSlug(getSuggestedDashboardSlug(starterDashboard.key));
+    setDashboardCreateDraftTitle(getSuggestedDashboardTitle(starterDashboard.title));
+    setDashboardCreateDraftDescription('');
+    setDashboardCreateDraftOwnerKind('user');
+    setDashboardCreateDraftOwnerKey('web-shell');
+    setDashboardCreateDraftCreatedBy('web-shell');
+    setDashboardCreateDraftSummary('');
+    setDashboardCreateDraftStatus('draft');
     setDashboardVersionDraftSummary('');
     setDashboardVersionDraftDescription('');
     setDashboardVersionDraftStatus('draft');
@@ -1305,6 +1381,83 @@ function App() {
       setDashboardNoticeTone('error');
     } finally {
       setIsSavingDashboardVersion(false);
+    }
+  }
+
+  async function handleCreateDashboard(): Promise<void> {
+    const slug = normalizeDashboardSlug(dashboardCreateDraftSlug);
+    const title = dashboardCreateDraftTitle.trim();
+    const ownerKey = dashboardCreateDraftOwnerKey.trim();
+    const createdBy = dashboardCreateDraftCreatedBy.trim();
+    const summary = dashboardCreateDraftSummary.trim();
+    const description = dashboardCreateDraftDescription.trim();
+
+    if (slug.length === 0) {
+      setDashboardNotice('A dashboard slug is required to create a new dashboard.');
+      setDashboardNoticeTone('error');
+      return;
+    }
+
+    if (title.length === 0) {
+      setDashboardNotice('A dashboard title is required to create a new dashboard.');
+      setDashboardNoticeTone('error');
+      return;
+    }
+
+    if (ownerKey.length === 0 || createdBy.length === 0) {
+      setDashboardNotice('Owner key and created by are required to create a new dashboard.');
+      setDashboardNoticeTone('error');
+      return;
+    }
+
+    try {
+      setIsCreatingDashboard(true);
+      setDashboardNotice(null);
+      setDashboardNoticeTone('default');
+
+      const nextDocument = structuredClone(dashboardDocument);
+      nextDocument.id = buildDashboardDocumentId(slug);
+      nextDocument.key = slug;
+      nextDocument.title = title;
+      nextDocument.version = 1;
+
+      const response = await fetch(`${API_BASE_URL}/dashboards`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slug,
+          description: description.length > 0 ? description : null,
+          ownerPrincipalKind: dashboardCreateDraftOwnerKind,
+          ownerPrincipalKey: ownerKey,
+          createdBy,
+          summary: summary.length > 0 ? summary : null,
+          status: dashboardCreateDraftStatus,
+          document: nextDocument,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(response, `Unable to create dashboard '${slug}'.`),
+        );
+      }
+
+      const payload = (await response.json()) as DashboardApiResponse;
+
+      setSelectedDashboardVersionNumber(null);
+      applyDashboardPayload(payload);
+      setDashboardNotice(`Dashboard '${payload.slug}' is now persisted as version ${payload.latestVersionNumber}.`);
+      setDashboardNoticeTone('success');
+      void loadDashboardDirectory();
+    } catch (error) {
+      setDashboardNotice(
+        error instanceof Error ? error.message : `Unable to create dashboard '${slug}'.`,
+      );
+      setDashboardNoticeTone('error');
+    } finally {
+      setIsCreatingDashboard(false);
     }
   }
 
@@ -1822,6 +1975,16 @@ function App() {
   const isRuntimeCanvasZoomInDisabled = runtimeCanvasZoomPercent >= runtimeCanvasZoomPercentMax;
   const isRuntimeCanvasDefaultView =
     runtimeCanvasScaleMode === 'fit' && runtimeCanvasZoomPercent === runtimeCanvasZoomPercentDefault;
+  const createDashboardSourceLabel =
+    selectedDashboardSummary != null
+      ? isViewingHistoricalDashboardVersion
+        ? `${selectedDashboardSummary.title} · v${selectedDashboardVersionNumber}`
+        : `${selectedDashboardSummary.title} · latest`
+      : 'Starter seed';
+  const isCreateDashboardDisabled = isCreatingDashboard;
+  const createDashboardTitle = isCreateDashboardDisabled
+    ? 'Wait for the current dashboard creation request to finish.'
+    : `Clone the currently loaded dashboard into a new persisted slug from ${createDashboardSourceLabel}.`;
   const runtimePreviewLabel = activeDashboardPage
     ? `${activeDashboardPage.title} · ${dashboardRuntimePanelEntries.length} live panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`
     : `${dashboardRuntimePanelEntries.length} live runtime panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`;
@@ -1911,6 +2074,120 @@ function App() {
               {dashboardSummaries.length} dashboard{dashboardSummaries.length === 1 ? '' : 's'} in
               the current store{selectedDashboardSummary ? ` · ${selectedDashboardSummary.title} loaded` : ''}
             </p>
+          </div>
+          <div className="dashboardVersionComposer">
+            <div className="dashboardVersionComposerHeader">
+              <div>
+                <h3>Create dashboard</h3>
+                <p className="runtimeMeta">
+                  Clone the currently loaded dashboard document into a new persisted dashboard.
+                </p>
+              </div>
+              <span className="dashboardDirectoryTag">Source: {createDashboardSourceLabel}</span>
+            </div>
+            <div className="dashboardVersionComposerFields">
+              <label className="dashboardVersionField">
+                <span>New slug</span>
+                <input
+                  type="text"
+                  value={dashboardCreateDraftSlug}
+                  onChange={(event) => setDashboardCreateDraftSlug(event.target.value)}
+                  placeholder="commerce-home-copy"
+                />
+              </label>
+              <label className="dashboardVersionField">
+                <span>Title</span>
+                <input
+                  type="text"
+                  value={dashboardCreateDraftTitle}
+                  onChange={(event) => setDashboardCreateDraftTitle(event.target.value)}
+                  placeholder="Commerce Executive Overview Copy"
+                />
+              </label>
+              <label className="dashboardVersionField">
+                <span>Owner kind</span>
+                <select
+                  value={dashboardCreateDraftOwnerKind}
+                  onChange={(event) =>
+                    setDashboardCreateDraftOwnerKind(event.target.value as DashboardOwnerPrincipalKind)
+                  }
+                >
+                  {dashboardOwnerPrincipalKinds.map((ownerKind) => (
+                    <option value={ownerKind} key={ownerKind}>
+                      {ownerKind}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="dashboardVersionField">
+                <span>Owner key</span>
+                <input
+                  type="text"
+                  value={dashboardCreateDraftOwnerKey}
+                  onChange={(event) => setDashboardCreateDraftOwnerKey(event.target.value)}
+                  placeholder="team-commerce"
+                />
+              </label>
+              <label className="dashboardVersionField">
+                <span>Created by</span>
+                <input
+                  type="text"
+                  value={dashboardCreateDraftCreatedBy}
+                  onChange={(event) => setDashboardCreateDraftCreatedBy(event.target.value)}
+                  placeholder="web-shell"
+                />
+              </label>
+              <label className="dashboardVersionField">
+                <span>Initial status</span>
+                <select
+                  value={dashboardCreateDraftStatus}
+                  onChange={(event) =>
+                    setDashboardCreateDraftStatus(event.target.value as DashboardVersionStatus)
+                  }
+                >
+                  {dashboardVersionStatuses.map((statusOption) => (
+                    <option value={statusOption} key={statusOption}>
+                      {statusOption}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="dashboardVersionField dashboardVersionFieldWide">
+                <span>Initial summary</span>
+                <input
+                  type="text"
+                  value={dashboardCreateDraftSummary}
+                  onChange={(event) => setDashboardCreateDraftSummary(event.target.value)}
+                  placeholder="Forked from the live shell runtime preview."
+                />
+              </label>
+              <label className="dashboardVersionField dashboardVersionFieldWide">
+                <span>Description</span>
+                <textarea
+                  value={dashboardCreateDraftDescription}
+                  onChange={(event) => setDashboardCreateDraftDescription(event.target.value)}
+                  rows={3}
+                  placeholder="Optional dashboard description saved into the metadata store."
+                />
+              </label>
+            </div>
+            <div className="dashboardVersionComposerActions">
+              <p className="runtimeMeta">
+                The new dashboard starts from the currently loaded document and resets its persisted
+                version to v1.
+              </p>
+              <button
+                type="button"
+                className="runtimeControl"
+                disabled={isCreateDashboardDisabled}
+                onClick={() => {
+                  void handleCreateDashboard();
+                }}
+                title={createDashboardTitle}
+              >
+                {isCreatingDashboard ? 'Creating dashboard...' : 'Create dashboard'}
+              </button>
+            </div>
           </div>
           {dashboardDirectoryState === 'error' ? (
             <p className="callout calloutError">
