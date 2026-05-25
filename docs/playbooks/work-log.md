@@ -275,61 +275,6 @@ Functional result:
 Validation:
 - `npm run build:web`
 
-## 66f5c89f · Dashboard-like runtime canvas
-
-Intent: make the active dashboard page preview feel closer to a stored dashboard canvas instead of only showing positioned cards on a neutral grid.
-
-What changed:
-- `apps/web/src/App.tsx` added canvas metadata and sizing helpers that derive a readable preview height and canvas label from the active page dimensions plus its `snapGrid`.
-- `apps/web/src/App.tsx` now wraps the runtime preview in a dedicated canvas frame and surfaces page-level metadata such as the original canvas size, snap dimensions, and cell count above the rendered panels.
-- `apps/web/src/styles.css` added a framed canvas surface with gradients, grid lines, and stronger panel chrome so the runtime preview reads more like an actual dashboard page.
-- `apps/web/src/styles.css` also keeps the mobile breakpoint safe by overriding the canvas aspect-ratio and collapsing the preview back to a one-column stack on smaller screens.
-
-Functional result:
-- The web shell now presents the active dashboard page as a clearer page-like canvas instead of a plain card list.
-- Stored page dimensions and grid structure are visible in the runtime preview, which makes layout inspection easier during bootstrap work.
-- Mobile behavior stays readable because the preview still abandons the desktop canvas layout below the responsive breakpoint.
-
-Validation:
-- `npm run build:web`
-
-## e2a32c51 · Layout-aware runtime preview
-
-Intent: make the active dashboard page preview reflect stored placement coordinates more directly instead of only showing panels in placement order.
-
-What changed:
-- `apps/web/src/App.tsx` added runtime grid helpers that derive column count, row count, and preview row sizing from the active page's `snapGrid`, width, and height.
-- `apps/web/src/App.tsx` now converts each panel placement into grid start and span values, then passes those values into the runtime preview as CSS custom properties.
-- `apps/web/src/App.tsx` keeps the existing active-page runtime execution flow but now renders each panel card inside a layout-aware canvas so the preview is closer to the stored page arrangement.
-- `apps/web/src/styles.css` added the runtime canvas/grid rules that consume the placement custom properties on desktop and collapse back to a safe single-column stack on smaller screens.
-
-Functional result:
-- The active page preview now uses stored `x`, `y`, `width`, and `height` values to approximate the original dashboard layout.
-- Multi-panel pages are easier to inspect because the runtime shell no longer treats every panel as the same generic card slot.
-- Mobile rendering stays readable because the preview still falls back to a stacked layout below the desktop breakpoint.
-
-Validation:
-- `npm run build:web`
-
-## f200b7b3 · Placement-aware runtime panel rendering
-
-Intent: stop dropping active-page layout information after panel execution so the shell can render more than one table panel and keep the runtime aligned with the selected page's stored placements.
-
-What changed:
-- `apps/web/src/App.tsx` replaced the panel-selection helper with a placement-aware runtime entry helper that keeps both the active page placement metadata and the linked panel definition together.
-- `apps/web/src/App.tsx` now initializes query runtime state and executes panel queries from that runtime entry list, so the execution path stays aligned with the same active-page ordering used for rendering.
-- `apps/web/src/App.tsx` removed the separate `dashboardScorecardPanels` and first-`dashboardTablePanel` render split and now renders each active-page runtime entry in order, including multiple table panels when present.
-- `apps/web/src/App.tsx` also leaves unsupported panel kinds visible as placeholder cards instead of silently omitting them from the page preview.
-- `apps/web/src/styles.css` added the grid and full-width card rules for the new runtime panel list so scorecards and table-style panels still read cleanly in the shell.
-
-Functional result:
-- The active dashboard page can now render all supported scorecard and table panels instead of only the first table plus a scorecard group.
-- The runtime preview follows stored placement order more closely, which makes multi-panel pages easier to inspect from the existing shell.
-- Newly introduced panel kinds are at least visible as placeholders until a dedicated renderer is added.
-
-Validation:
-- `npm run build:web`
-
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
@@ -408,6 +353,79 @@ Functional result:
 - The live panel runtime can now follow the currently selected dashboard page rather than being pinned to the first page in the document.
 - Persisted multi-page dashboards can expose different panel groups in the existing shell without changing the backend API contract.
 - The dashboard document preview now reflects the full page list instead of silently describing only page 1.
+
+Validation:
+- `npm run build:web`
+
+## f200b7b3 · Placement-aware runtime panel rendering
+
+Intent: stop dropping active-page layout information after panel execution so the shell can render more than one table panel and keep the runtime aligned with the selected page's stored placements.
+
+What changed:
+- `apps/web/src/App.tsx` replaced the panel-selection helper with a placement-aware runtime entry helper that keeps both the active page placement metadata and the linked panel definition together.
+- `apps/web/src/App.tsx` now initializes query runtime state and executes panel queries from that runtime entry list, so the execution path stays aligned with the same active-page ordering used for rendering.
+- `apps/web/src/App.tsx` removed the separate `dashboardScorecardPanels` and first-`dashboardTablePanel` render split and now renders each active-page runtime entry in order, including multiple table panels when present.
+- `apps/web/src/App.tsx` also leaves unsupported panel kinds visible as placeholder cards instead of silently omitting them from the page preview.
+- `apps/web/src/styles.css` added the grid and full-width card rules for the new runtime panel list so scorecards and table-style panels still read cleanly in the shell.
+
+Functional result:
+- The active dashboard page can now render all supported scorecard and table panels instead of only the first table plus a scorecard group.
+- The runtime preview follows stored placement order more closely, which makes multi-panel pages easier to inspect from the existing shell.
+- Newly introduced panel kinds are at least visible as placeholders until a dedicated renderer is added.
+
+Validation:
+- `npm run build:web`
+
+## e2a32c51 · Layout-aware runtime preview
+
+Intent: make the active dashboard page preview reflect stored placement coordinates more directly instead of only showing panels in placement order.
+
+What changed:
+- `apps/web/src/App.tsx` added runtime grid helpers that derive column count, row count, and preview row sizing from the active page's `snapGrid`, width, and height.
+- `apps/web/src/App.tsx` now converts each panel placement into grid start and span values, then passes those values into the runtime preview as CSS custom properties.
+- `apps/web/src/App.tsx` keeps the existing active-page runtime execution flow but now renders each panel card inside a layout-aware canvas so the preview is closer to the stored page arrangement.
+- `apps/web/src/styles.css` added the runtime canvas/grid rules that consume the placement custom properties on desktop and collapse back to a safe single-column stack on smaller screens.
+
+Functional result:
+- The active page preview now uses stored `x`, `y`, `width`, and `height` values to approximate the original dashboard layout.
+- Multi-panel pages are easier to inspect because the runtime shell no longer treats every panel as the same generic card slot.
+- Mobile rendering stays readable because the preview still falls back to a stacked layout below the desktop breakpoint.
+
+Validation:
+- `npm run build:web`
+
+## 66f5c89f · Dashboard-like runtime canvas
+
+Intent: make the active dashboard page preview feel closer to a stored dashboard canvas instead of only showing positioned cards on a neutral grid.
+
+What changed:
+- `apps/web/src/App.tsx` added canvas metadata and sizing helpers that derive a readable preview height and canvas label from the active page dimensions plus its `snapGrid`.
+- `apps/web/src/App.tsx` now wraps the runtime preview in a dedicated canvas frame and surfaces page-level metadata such as the original canvas size, snap dimensions, and cell count above the rendered panels.
+- `apps/web/src/styles.css` added a framed canvas surface with gradients, grid lines, and stronger panel chrome so the runtime preview reads more like an actual dashboard page.
+- `apps/web/src/styles.css` also keeps the mobile breakpoint safe by overriding the canvas aspect-ratio and collapsing the preview back to a one-column stack on smaller screens.
+
+Functional result:
+- The web shell now presents the active dashboard page as a clearer page-like canvas instead of a plain card list.
+- Stored page dimensions and grid structure are visible in the runtime preview, which makes layout inspection easier during bootstrap work.
+- Mobile behavior stays readable because the preview still abandons the desktop canvas layout below the responsive breakpoint.
+
+Validation:
+- `npm run build:web`
+
+## 7b8211d1 · Runtime canvas view controls
+
+Intent: make large dashboard pages easier to inspect in the bootstrap shell without changing stored layout data or losing the fit-to-width view.
+
+What changed:
+- `apps/web/src/App.tsx` added a `runtimeCanvasScaleMode` state with `fit` and `detail` presets for the active page preview.
+- `apps/web/src/App.tsx` updated the runtime canvas sizing helper so the chosen view mode changes canvas width, preview height, and row sizing while keeping the same placement-driven layout model.
+- `apps/web/src/App.tsx` also wrapped the preview canvas in a scrollable container and surfaced the active view mode in the canvas header.
+- `apps/web/src/styles.css` added pill-style view controls plus the canvas header and horizontal scroller styling needed for detail-mode inspection.
+
+Functional result:
+- The runtime preview can now stay fit to the panel width by default or switch into a larger detail view for closer inspection.
+- Larger dashboard pages can be panned horizontally in detail mode instead of forcing every preview to remain compressed.
+- The stored dashboard layout model remains unchanged because the controls only affect preview scaling in the shell.
 
 Validation:
 - `npm run build:web`
