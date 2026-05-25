@@ -4,6 +4,7 @@ import {
   dataSourceKinds,
   starterDashboard,
   systemRoles,
+  type PanelRef,
 } from '@flooks/dashboard-schema';
 
 const API_BASE_URL = (
@@ -106,15 +107,46 @@ type QueryExecutionResponse = {
 
 type RequestState = 'loading' | 'ready' | 'error';
 
+type PanelRuntimeEntry = {
+  state: RequestState;
+  data: QueryExecutionResponse | null;
+  errorMessage: string | null;
+};
+
 const numberFormatter = new Intl.NumberFormat('en-US');
 
-const liveQueryPanelRequest = {
-  datasetKey: 'mart_commerce_daily',
-  dimensions: ['channel_name'],
-  metrics: [{ key: 'revenue', aggregate: 'sum' }],
-  sort: [{ field: 'revenue', direction: 'desc' }],
-  limit: 5,
-} as const;
+function isScorecardPanel(
+  panel: PanelRef | undefined,
+): panel is PanelRef & {
+  kind: 'scorecard';
+  query: NonNullable<PanelRef['query']>;
+  scorecard: NonNullable<PanelRef['scorecard']>;
+} {
+  return panel?.kind === 'scorecard' && panel.query != null && panel.scorecard != null;
+}
+
+function isTablePanel(
+  panel: PanelRef | undefined,
+): panel is PanelRef & {
+  kind: 'table';
+  query: NonNullable<PanelRef['query']>;
+  table: NonNullable<PanelRef['table']>;
+} {
+  return panel?.kind === 'table' && panel.query != null && panel.table != null;
+}
+
+const starterDashboardPanelsById = new Map(
+  starterDashboard.panelLibrary.map((panel) => [panel.id, panel]),
+);
+
+const starterDashboardRuntimePanels =
+  starterDashboard.pages[0]?.placements
+    .map((placement) => starterDashboardPanelsById.get(placement.panelId))
+    .filter((panel): panel is PanelRef => panel != null) ?? [];
+
+const starterDashboardScorecardPanels = starterDashboardRuntimePanels.filter(isScorecardPanel);
+
+const starterDashboardTablePanel = starterDashboardRuntimePanels.find(isTablePanel) ?? null;
 
 const launchTracks = [
   {
@@ -198,6 +230,34 @@ function formatQueryCellValue(value: QueryResultValue | undefined): string {
   return value ?? '';
 }
 
+function formatScorecardValue(
+  value: QueryResultValue | undefined,
+  valuePrefix?: string,
+  valueSuffix?: string,
+): string {
+  const formattedValue = formatQueryCellValue(value);
+
+  if (formattedValue.length === 0) {
+    return 'No data';
+  }
+
+  return `${valuePrefix ?? ''}${formattedValue}${valueSuffix ?? ''}`;
+}
+
+function buildInitialPanelRuntime(): Record<string, PanelRuntimeEntry> {
+  return starterDashboardRuntimePanels.reduce<Record<string, PanelRuntimeEntry>>((state, panel) => {
+    if (panel.query != null) {
+      state[panel.id] = {
+        state: 'loading',
+        data: null,
+        errorMessage: null,
+      };
+    }
+
+    return state;
+  }, {});
+}
+
 async function getResponseMessage(response: Response, fallback: string): Promise<string> {
   try {
     const payload = (await response.json()) as {
@@ -222,11 +282,11 @@ function App() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [apiReference, setApiReference] = useState<ApiReferenceResponse | null>(null);
-  const [liveQuery, setLiveQuery] = useState<QueryExecutionResponse | null>(null);
+  const [panelRuntime, setPanelRuntime] = useState<Record<string, PanelRuntimeEntry>>(() =>
+    buildInitialPanelRuntime(),
+  );
   const [requestState, setRequestState] = useState<RequestState>('loading');
-  const [liveQueryState, setLiveQueryState] = useState<RequestState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [liveQueryErrorMessage, setLiveQueryErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -282,52 +342,68 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
 
-    async function loadLiveQueryPanel() {
-      try {
-        setLiveQueryState('loading');
-        setLiveQueryErrorMessage(null);
+    async function loadDashboardRuntimePanels() {
+      setPanelRuntime(buildInitialPanelRuntime());
 
-        const response = await fetch(`${API_BASE_URL}/query/execute`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(liveQueryPanelRequest),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(
-            await getResponseMessage(
-              response,
-              'The live query panel is waiting for analytics data and connector access.',
-            ),
-          );
+      for (const panel of starterDashboardRuntimePanels) {
+        if (panel.query == null) {
+          continue;
         }
 
-        const payload = (await response.json()) as QueryExecutionResponse;
+        try {
+          const response = await fetch(`${API_BASE_URL}/query/execute`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(panel.query),
+            signal: controller.signal,
+          });
 
-        if (controller.signal.aborted) {
-          return;
+          if (!response.ok) {
+            throw new Error(
+              await getResponseMessage(
+                response,
+                `${panel.title} is waiting for analytics data and connector access.`,
+              ),
+            );
+          }
+
+          const payload = (await response.json()) as QueryExecutionResponse;
+
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          setPanelRuntime((currentState) => ({
+            ...currentState,
+            [panel.id]: {
+              state: 'ready',
+              data: payload,
+              errorMessage: null,
+            },
+          }));
+        } catch (error) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          setPanelRuntime((currentState) => ({
+            ...currentState,
+            [panel.id]: {
+              state: 'error',
+              data: null,
+              errorMessage:
+                error instanceof Error
+                  ? error.message
+                  : `Unable to execute the ${panel.title} panel preview.`,
+            },
+          }));
         }
-
-        setLiveQuery(payload);
-        setLiveQueryState('ready');
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setLiveQueryState('error');
-        setLiveQueryErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Unable to execute the live query panel preview.',
-        );
       }
     }
 
-    void loadLiveQueryPanel();
+    void loadDashboardRuntimePanels();
 
     return () => {
       controller.abort();
@@ -341,8 +417,6 @@ function App() {
   const heroSummary =
     overview?.summary ??
     'V1은 Linkmerce mart 기반 사내 대시보드 플랫폼으로 시작하고, 이후 다양한 데이터 소스와 커스텀 패널 SDK를 열어가는 구조로 설계합니다.';
-  const liveQueryResults = liveQuery?.results ?? [];
-  const liveQueryColumns = liveQuery?.columnNames ?? [];
 
   return (
     <div className="shell">
@@ -620,77 +694,101 @@ function App() {
         <section className="panel panelWide">
           <div className="panelHeader">
             <span className="chip">Live Panel Runtime</span>
-            <h2>Governed revenue panel preview</h2>
+            <h2>Starter dashboard panel preview</h2>
             <p className="sectionSummary">
-              The web shell now sends a fixed QuerySpec to the live query execution API and renders the
-              first scorecard-plus-table runtime slice from the response.
+              The web shell now reads first-party panel definitions from the starter dashboard document
+              and executes each scorecard/table panel through the live query execution API.
             </p>
           </div>
-          {liveQuery && liveQueryState === 'ready' ? (
-            <div className="runtimeLayout">
-              <div className="runtimeStats">
-                <article className="runtimeStat">
-                  <span>Returned Rows</span>
-                  <strong>{liveQuery.rowCount}</strong>
-                  <p>Top channel groups returned by the sample governed query.</p>
-                </article>
-                <article className="runtimeStat">
-                  <span>Connector</span>
-                  <strong>{liveQuery.executionMetadata.connector ?? 'Unknown'}</strong>
-                  <p>The current panel runtime stays inside the same connector-gated execution path.</p>
-                </article>
-                <article className="runtimeStat">
-                  <span>Duration</span>
-                  <strong>
-                    {liveQuery.executionMetadata.durationMs != null
-                      ? `${liveQuery.executionMetadata.durationMs} ms`
-                      : 'Pending'}
-                  </strong>
-                  <p>Execution timing returned directly by the backend response metadata.</p>
-                </article>
-              </div>
+          <div className="runtimeLayout">
+            <div className="runtimeStats">
+              {starterDashboardScorecardPanels.map((panel) => {
+                const runtime = panelRuntime[panel.id];
+                const value = runtime?.data?.results[0]?.[panel.scorecard.valueField];
 
+                return (
+                  <article className="runtimeStat" key={panel.id}>
+                    <span>{panel.title}</span>
+                    <strong>
+                      {runtime?.state === 'ready'
+                        ? formatScorecardValue(
+                            value,
+                            panel.scorecard.valuePrefix,
+                            panel.scorecard.valueSuffix,
+                          )
+                        : runtime?.state === 'error'
+                          ? 'Unavailable'
+                          : 'Loading'}
+                    </strong>
+                    <p>{panel.scorecard.description}</p>
+                    <p className="runtimeMeta">
+                      {panel.datasetKey} ·{' '}
+                      {runtime?.data?.executionMetadata.connector ?? 'POST /query/execute'}
+                    </p>
+                    <p className="runtimeMeta">
+                      {runtime?.data?.executionMetadata.durationMs != null
+                        ? `${runtime.data.executionMetadata.durationMs} ms`
+                        : 'Awaiting panel result'}
+                    </p>
+                    {runtime?.state === 'error' && runtime.errorMessage ? (
+                      <p className="inlineNotice">{runtime.errorMessage}</p>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+
+            {starterDashboardTablePanel ? (
               <div className="runtimeTableCard">
                 <div className="runtimeTableHeader">
-                  <span className="kicker">POST /query/execute</span>
-                  <span className="queryBadge">mart_commerce_daily · revenue by channel</span>
+                  <span className="kicker">{starterDashboardTablePanel.title}</span>
+                  <span className="queryBadge">
+                    {starterDashboardTablePanel.datasetKey} · top {starterDashboardTablePanel.query.limit ?? 0}
+                  </span>
                 </div>
+                <p className="runtimeMeta">{starterDashboardTablePanel.table.description}</p>
 
-                {liveQueryResults.length > 0 ? (
-                  <div className="queryTableWrap">
-                    <table className="queryTable">
-                      <thead>
-                        <tr>
-                          {liveQueryColumns.map((column) => (
-                            <th key={column} scope="col">
-                              {column}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {liveQueryResults.map((row, index) => (
-                          <tr key={`row-${index}`}>
-                            {liveQueryColumns.map((column) => (
-                              <td key={`${index}-${column}`}>{formatQueryCellValue(row[column])}</td>
+                {panelRuntime[starterDashboardTablePanel.id]?.state === 'ready' &&
+                panelRuntime[starterDashboardTablePanel.id]?.data ? (
+                  (panelRuntime[starterDashboardTablePanel.id]?.data?.results.length ?? 0) > 0 ? (
+                    <div className="queryTableWrap">
+                      <table className="queryTable">
+                        <thead>
+                          <tr>
+                            {starterDashboardTablePanel.table.columns.map((column) => (
+                              <th key={column} scope="col">
+                                {column}
+                              </th>
                             ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {panelRuntime[starterDashboardTablePanel.id]?.data?.results.map((row, index) => (
+                            <tr key={`row-${index}`}>
+                              {starterDashboardTablePanel.table.columns.map((column) => (
+                                <td key={`${index}-${column}`}>{formatQueryCellValue(row[column])}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="callout">The table panel executed successfully, but the dataset returned no rows.</p>
+                  )
+                ) : panelRuntime[starterDashboardTablePanel.id]?.state === 'error' ? (
+                  <p className="callout calloutError">
+                    {panelRuntime[starterDashboardTablePanel.id]?.errorMessage ??
+                      'The table panel could not be rendered yet.'}
+                  </p>
                 ) : (
-                  <p className="callout">The sample QuerySpec executed successfully, but the dataset returned no rows.</p>
+                  <p className="callout">
+                    Executing the starter dashboard table panel against {API_BASE_URL}/query/execute
+                  </p>
                 )}
               </div>
-            </div>
-          ) : (
-            <p className={`callout ${liveQueryState === 'error' ? 'calloutError' : ''}`}>
-              {liveQueryState === 'error'
-                ? liveQueryErrorMessage ?? 'The live query panel could not be rendered yet.'
-                : `Executing a governed sample query against ${API_BASE_URL}/query/execute`}
-            </p>
-          )}
+            ) : null}
+          </div>
         </section>
 
         <section className="panel panelWide">
@@ -708,7 +806,11 @@ function App() {
             </div>
             <div>
               <h3>Panel Library</h3>
-              <p>{starterDashboard.panelLibrary.map((panel) => panel.title).join(' / ')}</p>
+              <p>
+                {starterDashboard.panelLibrary
+                  .map((panel) => `${panel.title} (${panel.kind})`)
+                  .join(' / ')}
+              </p>
             </div>
           </div>
         </section>

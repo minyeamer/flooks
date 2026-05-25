@@ -12,6 +12,14 @@ export const dataSourceKinds = [
 
 export type DataSourceKind = (typeof dataSourceKinds)[number];
 
+export const metricAggregates = ['sum', 'count', 'avg', 'min', 'max'] as const;
+
+export type MetricAggregate = (typeof metricAggregates)[number];
+
+export const sortDirections = ['asc', 'desc'] as const;
+
+export type SortDirection = (typeof sortDirections)[number];
+
 export type PanelKind =
   | 'table'
   | 'scorecard'
@@ -20,6 +28,36 @@ export type PanelKind =
   | 'pie'
   | 'notice';
 
+export type PanelMetricSpec = {
+  key: string;
+  aggregate: MetricAggregate;
+};
+
+export type PanelSortSpec = {
+  field: string;
+  direction: SortDirection;
+};
+
+export type PanelQuerySpec = {
+  datasetKey: string;
+  dimensions: string[];
+  metrics: PanelMetricSpec[];
+  sort?: PanelSortSpec[];
+  limit?: number;
+};
+
+export type ScorecardPanelConfig = {
+  description: string;
+  valueField: string;
+  valuePrefix?: string;
+  valueSuffix?: string;
+};
+
+export type TablePanelConfig = {
+  description: string;
+  columns: string[];
+};
+
 export type PanelRef = {
   id: string;
   key: string;
@@ -27,6 +65,9 @@ export type PanelRef = {
   title: string;
   datasetKey: string;
   byReference: boolean;
+  query?: PanelQuerySpec;
+  scorecard?: ScorecardPanelConfig;
+  table?: TablePanelConfig;
 };
 
 export type PanelPlacement = {
@@ -81,7 +122,7 @@ export const starterDashboard: DashboardDocument = {
       placements: [
         { panelId: 'panel-gmv', x: 40, y: 40, width: 300, height: 180, zIndex: 1 },
         { panelId: 'panel-revenue', x: 360, y: 40, width: 300, height: 180, zIndex: 1 },
-        { panelId: 'panel-trend', x: 40, y: 240, width: 920, height: 320, zIndex: 1 },
+        { panelId: 'panel-channel-table', x: 40, y: 240, width: 920, height: 320, zIndex: 1 },
       ],
     },
   ],
@@ -93,6 +134,17 @@ export const starterDashboard: DashboardDocument = {
       title: 'GMV',
       datasetKey: 'mart_commerce_daily',
       byReference: true,
+      query: {
+        datasetKey: 'mart_commerce_daily',
+        dimensions: [],
+        metrics: [{ key: 'gmv', aggregate: 'sum' }],
+        limit: 1,
+      },
+      scorecard: {
+        description: 'Total GMV returned by the governed query execution path.',
+        valueField: 'gmv',
+        valuePrefix: '$',
+      },
     },
     {
       id: 'panel-revenue',
@@ -101,14 +153,36 @@ export const starterDashboard: DashboardDocument = {
       title: 'Revenue',
       datasetKey: 'mart_commerce_daily',
       byReference: true,
+      query: {
+        datasetKey: 'mart_commerce_daily',
+        dimensions: [],
+        metrics: [{ key: 'revenue', aggregate: 'sum' }],
+        limit: 1,
+      },
+      scorecard: {
+        description: 'Net revenue total executed from the starter dashboard document.',
+        valueField: 'revenue',
+        valuePrefix: '$',
+      },
     },
     {
-      id: 'panel-trend',
-      key: 'revenue-trend',
-      kind: 'line',
-      title: 'Revenue Trend',
+      id: 'panel-channel-table',
+      key: 'channel-revenue-table',
+      kind: 'table',
+      title: 'Revenue by Channel',
       datasetKey: 'mart_commerce_daily',
       byReference: true,
+      query: {
+        datasetKey: 'mart_commerce_daily',
+        dimensions: ['channel_name'],
+        metrics: [{ key: 'revenue', aggregate: 'sum' }],
+        sort: [{ field: 'revenue', direction: 'desc' }],
+        limit: 5,
+      },
+      table: {
+        description: 'Top channels ranked by revenue from the live governed query response.',
+        columns: ['channel_name', 'revenue'],
+      },
     },
   ],
 };

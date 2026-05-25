@@ -380,7 +380,7 @@ h1 {
 }
 
 .runtimeStats {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .runtimeStat,
@@ -414,6 +414,11 @@ h1 {
 .runtimeStat p {
   color: var(--muted);
   line-height: 1.7;
+}
+
+.runtimeMeta {
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .runtimeTableCard {
