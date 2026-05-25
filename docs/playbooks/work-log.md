@@ -786,3 +786,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 75ee8f64 · Expand starter history filters
+
+Intent: extend the starter history toolbar from a single failed-only filter into a fuller action-kind navigator so operators can isolate creates, refreshes, no-op alignments, and failures without reading the entire trail.
+
+What changed:
+- `apps/web/src/App.tsx` expanded the starter history filter model from `All/Failed` to `All/Created/Refreshed/Aligned/Failed`.
+- `apps/web/src/App.tsx` now derives per-kind counts, uses those counts to enable or disable each filter pill, and automatically falls back to `All` when the selected kind no longer exists in the current session history.
+- `apps/web/src/App.tsx` also uses the active filter label in the filtered empty state so the toolbar explains exactly which action kind is absent.
+- `apps/web/src/styles.css` added the small alignment adjustment needed for the denser multi-pill filter row.
+
+Functional result:
+- Operators can now isolate starter creates, real seed refreshes, no-op alignments, and failures directly from the history toolbar.
+- The filter row remains compact because each action-kind pill carries its own count instead of requiring a separate legend or summary line.
+- If the selected action kind disappears from the current session history, the shell automatically returns to the full trail rather than leaving the user in a stale empty filter state.
+
+Validation:
+- `npm run build:web`
