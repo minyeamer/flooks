@@ -202,6 +202,7 @@ const runtimeCanvasZoomPercentDefault = 100;
 const runtimeCanvasZoomPercentStep = 15;
 const runtimeCanvasZoomPercentMin = 85;
 const runtimeCanvasZoomPercentMax = 170;
+const clearStarterHistoryConfirmTimeoutMs = 4000;
 const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f'] as const;
 const starterDashboardBootstrapOwnerKey = 'system-bootstrap';
 const starterRefreshHistoryStorageKey = 'flooks.starter-refresh-history';
@@ -1032,6 +1033,20 @@ function App() {
   }, [starterRefreshHistory]);
 
   useEffect(() => {
+    if (!isClearStarterHistoryArmed) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsClearStarterHistoryArmed(false);
+    }, clearStarterHistoryConfirmTimeoutMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isClearStarterHistoryArmed]);
+
+  useEffect(() => {
     setIsClearStarterHistoryArmed(false);
   }, [starterRefreshHistory]);
 
@@ -1149,7 +1164,7 @@ function App() {
     isRefreshingStarterDashboard || starterRefreshHistory.length === 0;
   const clearStarterHistoryTitle =
     isClearStarterHistoryArmed
-      ? 'Click again to clear recent starter actions saved for this browser session'
+      ? `Click again within ${clearStarterHistoryConfirmTimeoutMs / 1000} seconds to clear recent starter actions saved for this browser session`
       : starterRefreshHistory.length > 0
       ? 'Clear recent starter actions saved for this browser session'
       : 'No recent starter actions saved for this browser session';
@@ -1541,7 +1556,9 @@ function App() {
                   onClick={handleClearStarterRefreshHistory}
                   title={clearStarterHistoryTitle}
                 >
-                  {isClearStarterHistoryArmed ? 'Confirm clear' : 'Clear history'}
+                  {isClearStarterHistoryArmed
+                    ? `Confirm clear (${clearStarterHistoryConfirmTimeoutMs / 1000}s)`
+                    : 'Clear history'}
                 </button>
               </div>
               <div className="runtimeControlGroup" aria-label="Runtime canvas view mode">
