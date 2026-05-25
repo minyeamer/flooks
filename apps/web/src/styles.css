@@ -487,6 +487,56 @@ h1 {
   gap: 8px 16px;
 }
 
+.runtimeControlGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.runtimeControl {
+  padding: 10px 14px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.runtimeControl:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.24);
+  box-shadow: 0 14px 24px rgba(24, 34, 45, 0.08);
+}
+
+.runtimeControlActive {
+  border-color: rgba(15, 118, 110, 0.24);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.runtimeCanvasHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.runtimeCanvasScroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+}
+
 .pageSelector {
   display: flex;
   flex-wrap: wrap;
@@ -790,6 +840,11 @@ h1 {
   .runtimeToolbar {
     flex-direction: column;
     gap: 6px;
+  }
+
+  .runtimeControlGroup,
+  .runtimeCanvasHeader {
+    width: 100%;
   }
 
   .runtimeCanvasFrame {
