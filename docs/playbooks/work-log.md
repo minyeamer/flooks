@@ -275,6 +275,24 @@ Functional result:
 Validation:
 - `npm run build:web`
 
+## b424d0d1 · Runtime canvas zoom reset
+
+Intent: make the runtime canvas controls more usable by adding stepwise zoom adjustments and a single action that restores the default fit view.
+
+What changed:
+- `apps/web/src/App.tsx` added a `runtimeCanvasZoomPercent` state and layered it on top of the existing `fit` and `detail` base scale modes.
+- `apps/web/src/App.tsx` updated the runtime canvas sizing helper so zoom changes affect the effective canvas width, preview height, and row sizing without changing the placement-driven layout model.
+- `apps/web/src/App.tsx` also added `-`, `Reset`, and `+` controls to the runtime toolbar and surfaced the current zoom percentage in the canvas header.
+- `apps/web/src/styles.css` added explicit disabled-state styling for the zoom buttons so the controls stay visually consistent at the zoom limits.
+
+Functional result:
+- The runtime preview can now be nudged in smaller zoom steps instead of relying only on the coarse `fit` and `detail` presets.
+- One reset action returns the shell to the default fit view, which makes large-page inspection less sticky after manual zooming.
+- The underlying stored dashboard layout is still unchanged because zoom only affects the preview scale in the shell.
+
+Validation:
+- `npm run build:web`
+
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
