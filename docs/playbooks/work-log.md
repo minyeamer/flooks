@@ -700,7 +700,7 @@ Functional result:
 Validation:
 - `npm run build:web`
 
-## Same commit · Shorter starter history summaries
+## 4f8fa10e · Shorter starter history summaries
 
 Intent: now that action badges already carry the action category, shorten each recent starter history summary into a denser subject line so the trail is faster to scan.
 
@@ -713,6 +713,23 @@ Functional result:
 - The recent starter action trail is denser because the badge carries the action category and the summary line now focuses on the affected starter surface.
 - Existing browser-session history continues to load because action-kind inference understands both the earlier summary wording and the shorter wording introduced here.
 - Repeated starter operations are easier to scan without losing the detailed explanation line underneath each entry.
+
+Validation:
+- `npm run build:web`
+
+## 26d19a45 · Shorter starter history details
+
+Intent: now that recent starter history entries already have explicit action badges and compact context labels, shorten the success detail lines so the trail keeps more information in less space.
+
+What changed:
+- `apps/web/src/App.tsx` tightened the success detail text for starter history entries created by starter persistence, starter refresh, and no-op alignment checks.
+- `apps/web/src/App.tsx` now records short detail lines such as `Persisted as vN`, `Advanced vA -> vB`, and `No version change; stayed at vN` instead of longer explanatory sentences.
+- The failure path remains unchanged, so real refresh errors still preserve the raw error message instead of being compressed away.
+
+Functional result:
+- The recent starter action trail is denser because the success detail line now complements the badge and context labels instead of repeating surrounding metadata.
+- Operators can still tell what changed between versions, but repeated starter operations are easier to scan in the compact toolbar surface.
+- Refresh failures continue to show the full error text, which keeps the operationally important path more verbose than the success path.
 
 Validation:
 - `npm run build:web`
