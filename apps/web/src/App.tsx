@@ -1699,13 +1699,17 @@ function App() {
                           className={`runtimeStarterHistoryFilterButton${starterRefreshHistoryFilter === 'failed' ? ' runtimeStarterHistoryFilterButtonActive' : ''}`}
                           disabled={failedStarterRefreshHistoryCount === 0}
                           onClick={() => setStarterRefreshHistoryFilter('failed')}
+                          aria-label={`Show failed starter actions (${failedStarterRefreshHistoryCount})`}
                           title={
                             failedStarterRefreshHistoryCount > 0
                               ? `Show ${failedStarterRefreshHistoryCount} failed starter action${failedStarterRefreshHistoryCount === 1 ? '' : 's'}`
                               : 'No failed starter actions in this browser session'
                           }
                         >
-                          Failed
+                          <span>Failed</span>
+                          <span className="runtimeStarterHistoryFilterCount" aria-hidden="true">
+                            {failedStarterRefreshHistoryCount}
+                          </span>
                         </button>
                       </div>
                     </div>
