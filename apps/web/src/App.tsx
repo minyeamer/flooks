@@ -102,6 +102,7 @@ type DashboardApiResponse = {
   ownerPrincipalKey: string;
   updatedAt: string;
   document: DashboardDocument;
+  versions: DashboardVersionSummaryResponse[];
 };
 
 type DashboardSummaryResponse = {
@@ -113,6 +114,14 @@ type DashboardSummaryResponse = {
   latestVersionNumber: number;
   latestVersionStatus: 'draft' | 'published' | 'archived';
   updatedAt: string;
+};
+
+type DashboardVersionSummaryResponse = {
+  versionNumber: number;
+  status: 'draft' | 'published' | 'archived';
+  summary: string | null;
+  createdBy: string;
+  createdAt: string;
 };
 
 type QueryResultValue = string | number | boolean;
@@ -971,7 +980,11 @@ function App() {
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [apiReference, setApiReference] = useState<ApiReferenceResponse | null>(null);
   const [dashboardSummaries, setDashboardSummaries] = useState<DashboardSummaryResponse[]>([]);
+  const [dashboardVersions, setDashboardVersions] = useState<DashboardVersionSummaryResponse[]>([]);
   const [selectedDashboardSlug, setSelectedDashboardSlug] = useState<string>(starterDashboard.key);
+  const [selectedDashboardVersionNumber, setSelectedDashboardVersionNumber] = useState<number | null>(
+    null,
+  );
   const [dashboardDirectoryState, setDashboardDirectoryState] = useState<RequestState>('loading');
   const [dashboardDirectoryErrorMessage, setDashboardDirectoryErrorMessage] = useState<string | null>(null);
   const [dashboardDocument, setDashboardDocument] = useState<DashboardDocument>(starterDashboard);
@@ -1010,9 +1023,16 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   function applyDashboardPayload(payload: DashboardApiResponse): void {
+    const isViewingLatestDashboardVersion = payload.document.version === payload.latestVersionNumber;
+
     setDashboardDocument(payload.document);
+    setDashboardVersions(payload.versions);
     setSelectedDashboardSlug(payload.slug);
-    setDashboardSourceLabel(`Persisted v${payload.latestVersionNumber}`);
+    setDashboardSourceLabel(
+      isViewingLatestDashboardVersion
+        ? `Persisted v${payload.latestVersionNumber}`
+        : `Viewing v${payload.document.version} · latest v${payload.latestVersionNumber}`,
+    );
     setPersistedDashboardVersion(payload.latestVersionNumber);
     setPersistedDashboardUpdatedAt(payload.updatedAt);
     setPersistedDashboardVersionStatus(payload.latestVersionStatus);
@@ -1021,11 +1041,13 @@ function App() {
 
   function applyStarterSeedFallback(notice: string, tone: 'default' | 'error'): void {
     setDashboardDocument(starterDashboard);
+    setDashboardVersions([]);
     setDashboardSourceLabel('Starter seed');
     setPersistedDashboardVersion(null);
     setPersistedDashboardUpdatedAt(null);
     setPersistedDashboardVersionStatus(null);
     setDashboardOwnerPrincipalKey(null);
+    setSelectedDashboardVersionNumber(null);
     setStarterRefreshOutcome(null);
     setDashboardNotice(notice);
     setDashboardNoticeTone(tone);
@@ -1125,12 +1147,24 @@ function App() {
     }
   }
 
-  async function loadDashboardDocument(slug: string, signal?: AbortSignal): Promise<void> {
+  async function loadDashboardDocument(
+    slug: string,
+    versionNumber: number | null,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const requestedDashboardLabel =
+      versionNumber != null ? `dashboard '${slug}' version ${versionNumber}` : `dashboard '${slug}'`;
+
     try {
       setDashboardNotice(null);
       setDashboardNoticeTone('default');
 
-      const response = await fetch(`${API_BASE_URL}/dashboards/${slug}`, {
+      const dashboardHref =
+        versionNumber != null
+          ? `${API_BASE_URL}/dashboards/${slug}?version=${versionNumber}`
+          : `${API_BASE_URL}/dashboards/${slug}`;
+
+      const response = await fetch(dashboardHref, {
         signal,
       });
 
@@ -1139,7 +1173,7 @@ function App() {
           return;
         }
 
-        if (slug === starterDashboard.key) {
+        if (slug === starterDashboard.key && versionNumber == null) {
           applyStarterSeedFallback(
             `Persisted dashboard '${starterDashboard.key}' was not found yet. Using the starter document.`,
             'default',
@@ -1147,7 +1181,7 @@ function App() {
           return;
         }
 
-        throw new Error(`Dashboard '${slug}' was not found.`);
+        throw new Error(`${requestedDashboardLabel} was not found.`);
         return;
       }
 
@@ -1155,7 +1189,7 @@ function App() {
         throw new Error(
           await getResponseMessage(
             response,
-            `Unable to load dashboard '${slug}'.`,
+            `Unable to load ${requestedDashboardLabel}.`,
           ),
         );
       }
@@ -1172,7 +1206,7 @@ function App() {
         return;
       }
 
-      if (slug === starterDashboard.key) {
+      if (slug === starterDashboard.key && versionNumber == null) {
         applyStarterSeedFallback(
           error instanceof Error
             ? `${error.message} Using the starter document instead.`
@@ -1183,7 +1217,7 @@ function App() {
       }
 
       setDashboardNotice(
-        error instanceof Error ? error.message : `Unable to load dashboard '${slug}'.`,
+        error instanceof Error ? error.message : `Unable to load ${requestedDashboardLabel}.`,
       );
       setDashboardNoticeTone('error');
     }
@@ -1219,6 +1253,7 @@ function App() {
 
       const payload = (await response.json()) as DashboardApiResponse;
 
+      setSelectedDashboardVersionNumber(null);
       applyDashboardPayload(payload);
       const historyActionKind =
         previousPersistedVersion == null
@@ -1396,11 +1431,15 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
 
-    void loadDashboardDocument(selectedDashboardSlug, controller.signal);
+    void loadDashboardDocument(selectedDashboardSlug, selectedDashboardVersionNumber, controller.signal);
 
     return () => {
       controller.abort();
     };
+  }, [selectedDashboardSlug, selectedDashboardVersionNumber]);
+
+  useEffect(() => {
+    setSelectedDashboardVersionNumber(null);
   }, [selectedDashboardSlug]);
 
   useEffect(() => {
@@ -1553,6 +1592,21 @@ function App() {
   const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
   const selectedDashboardSummary =
     dashboardSummaries.find((summary) => summary.slug === selectedDashboardSlug) ?? null;
+  const dashboardVersionsByRecency = [...dashboardVersions].sort(
+    (leftVersion, rightVersion) => rightVersion.versionNumber - leftVersion.versionNumber,
+  );
+  const latestDashboardVersionSummary = dashboardVersionsByRecency[0] ?? null;
+  const selectedDashboardVersionSummary =
+    dashboardVersions.find((version) => version.versionNumber === dashboardDocument.version) ??
+    latestDashboardVersionSummary;
+  const isViewingLatestDashboardVersion =
+    selectedDashboardVersionSummary != null &&
+    latestDashboardVersionSummary != null &&
+    selectedDashboardVersionSummary.versionNumber === latestDashboardVersionSummary.versionNumber;
+  const formattedSelectedDashboardVersionCreatedAt =
+    selectedDashboardVersionSummary != null
+      ? dateTimeFormatter.format(new Date(selectedDashboardVersionSummary.createdAt))
+      : null;
   const isSelectedStarterDashboard = dashboardDocument.key === starterDashboard.key;
   const isPersistedStarterDashboard = isSelectedStarterDashboard && persistedDashboardVersion != null;
   const isBootstrapManagedStarterDashboard =
@@ -1816,6 +1870,79 @@ function App() {
                 : 'No dashboards have been persisted yet.'}
             </p>
           )}
+          {selectedDashboardSummary != null && dashboardVersionsByRecency.length > 0 ? (
+            <div className="dashboardVersionSection">
+              <div className="dashboardVersionHeader">
+                <div>
+                  <h3>Version history</h3>
+                  <p className="runtimeMeta">
+                    {isViewingLatestDashboardVersion
+                      ? `Viewing latest v${dashboardDocument.version}`
+                      : `Viewing v${dashboardDocument.version} · latest v${latestDashboardVersionSummary?.versionNumber ?? dashboardDocument.version}`}
+                  </p>
+                </div>
+                {formattedSelectedDashboardVersionCreatedAt ? (
+                  <p className="runtimeMeta">Created {formattedSelectedDashboardVersionCreatedAt}</p>
+                ) : null}
+              </div>
+              <div className="pageSelector" aria-label="Dashboard versions">
+                <button
+                  type="button"
+                  className={`pageTab${isViewingLatestDashboardVersion ? ' pageTabActive' : ''}`}
+                  onClick={() => setSelectedDashboardVersionNumber(null)}
+                >
+                  Latest v{latestDashboardVersionSummary?.versionNumber ?? dashboardDocument.version}
+                </button>
+                {dashboardVersionsByRecency
+                  .filter(
+                    (versionSummary) =>
+                      latestDashboardVersionSummary == null ||
+                      versionSummary.versionNumber !== latestDashboardVersionSummary.versionNumber,
+                  )
+                  .map((versionSummary) => (
+                    <button
+                      type="button"
+                      className={`pageTab${
+                        !isViewingLatestDashboardVersion &&
+                        versionSummary.versionNumber === dashboardDocument.version
+                          ? ' pageTabActive'
+                          : ''
+                      }`}
+                      key={`${selectedDashboardSummary.slug}-version-${versionSummary.versionNumber}`}
+                      onClick={() => setSelectedDashboardVersionNumber(versionSummary.versionNumber)}
+                    >
+                      v{versionSummary.versionNumber}
+                    </button>
+                  ))}
+              </div>
+              {selectedDashboardVersionSummary ? (
+                <div className="dashboardVersionSummary">
+                  <p>
+                    {selectedDashboardVersionSummary.summary ??
+                      'No summary was recorded for this persisted dashboard revision.'}
+                  </p>
+                  <div className="dashboardDirectoryLabels" aria-label="Selected dashboard version metadata">
+                    <span className="dashboardDirectoryTag">
+                      {selectedDashboardVersionSummary.status}
+                    </span>
+                    <span className="dashboardDirectoryTag">
+                      {selectedDashboardVersionSummary.createdBy}
+                    </span>
+                    {formattedSelectedDashboardVersionCreatedAt ? (
+                      <span className="dashboardDirectoryTag">
+                        Created {formattedSelectedDashboardVersionCreatedAt}
+                      </span>
+                    ) : null}
+                    {!isViewingLatestDashboardVersion && latestDashboardVersionSummary ? (
+                      <span className="dashboardDirectoryTag">
+                        Latest v{latestDashboardVersionSummary.versionNumber}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         <section className="panel panelWide">

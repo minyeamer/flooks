@@ -411,6 +411,34 @@ h1 {
   gap: 6px;
 }
 
+.dashboardVersionSection {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.dashboardVersionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  align-items: baseline;
+}
+
+.dashboardVersionSummary {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.dashboardVersionSummary p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .dashboardDirectoryTag {
   display: inline-flex;
   align-items: center;

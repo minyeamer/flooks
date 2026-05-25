@@ -19,6 +19,10 @@ from app.domain.identity import DatasetGrantAxis, ResourceAclTarget
 from app.domain.persistence import DashboardVersionStatus, PrincipalKind, ResourcePermission
 
 
+def _enum_values(enum_cls: type[object]) -> list[str]:
+    return [str(member.value) for member in enum_cls]  # type: ignore[attr-defined]
+
+
 class TimestampMixin:
     """Common timestamp columns for mutable metadata records."""
 
@@ -45,7 +49,7 @@ class DashboardRecord(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     owner_principal_kind: Mapped[PrincipalKind] = mapped_column(
-        Enum(PrincipalKind, name="principal_kind"),
+        Enum(PrincipalKind, name="principal_kind", values_callable=_enum_values),
         nullable=False,
     )
     owner_principal_key: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -73,7 +77,11 @@ class DashboardVersionRecord(Base):
     )
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[DashboardVersionStatus] = mapped_column(
-        Enum(DashboardVersionStatus, name="dashboard_version_status"),
+        Enum(
+            DashboardVersionStatus,
+            name="dashboard_version_status",
+            values_callable=_enum_values,
+        ),
         default=DashboardVersionStatus.DRAFT,
         nullable=False,
     )
@@ -106,17 +114,17 @@ class ResourceAclEntry(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     resource_type: Mapped[ResourceAclTarget] = mapped_column(
-        Enum(ResourceAclTarget, name="resource_acl_target"),
+        Enum(ResourceAclTarget, name="resource_acl_target", values_callable=_enum_values),
         nullable=False,
     )
     resource_key: Mapped[str] = mapped_column(String(160), nullable=False)
     principal_kind: Mapped[PrincipalKind] = mapped_column(
-        Enum(PrincipalKind, name="principal_kind"),
+        Enum(PrincipalKind, name="principal_kind", values_callable=_enum_values),
         nullable=False,
     )
     principal_key: Mapped[str] = mapped_column(String(160), nullable=False)
     permission: Mapped[ResourcePermission] = mapped_column(
-        Enum(ResourcePermission, name="resource_permission"),
+        Enum(ResourcePermission, name="resource_permission", values_callable=_enum_values),
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -137,7 +145,7 @@ class DatasetGrantRecord(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     dataset_key: Mapped[str] = mapped_column(String(160), nullable=False)
     grant_axis: Mapped[DatasetGrantAxis] = mapped_column(
-        Enum(DatasetGrantAxis, name="dataset_grant_axis"),
+        Enum(DatasetGrantAxis, name="dataset_grant_axis", values_callable=_enum_values),
         nullable=False,
     )
     subject_key: Mapped[str] = mapped_column(String(160), nullable=False)
