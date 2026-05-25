@@ -530,6 +530,37 @@ h1 {
   line-height: 1.6;
 }
 
+.runtimeSnapshot {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.runtimeSnapshotCard {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 12px 24px rgba(24, 34, 45, 0.06);
+}
+
+.runtimeSnapshotCard strong {
+  font-size: 1.02rem;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.runtimeSnapshotLabel {
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .runtimeToolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1353,6 +1384,7 @@ h1 {
   .cards,
   .documentPreview,
   .metricGrid,
+  .runtimeSnapshot,
   .runtimePanelList,
   .stepList,
   .referenceLayout,

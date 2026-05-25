@@ -1589,6 +1589,31 @@ function App() {
   const runtimePreviewLabel = activeDashboardPage
     ? `${activeDashboardPage.title} · ${dashboardRuntimePanelEntries.length} live panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`
     : `${dashboardRuntimePanelEntries.length} live runtime panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`;
+  const runtimeSnapshotCards = [
+    {
+      label: 'Dashboard',
+      value: dashboardDocument.title,
+      detail: `${dashboardSourceLabel} · ${dashboardDocument.key}`,
+    },
+    {
+      label: 'Active page',
+      value: activeDashboardPage?.title ?? 'Unavailable',
+      detail: `${dashboardDocument.pages.length} page${dashboardDocument.pages.length === 1 ? '' : 's'}`,
+    },
+    {
+      label: 'Live panels',
+      value: `${dashboardRuntimePanelEntries.length}`,
+      detail: `${dashboardDocument.panelLibrary.length} library panel${dashboardDocument.panelLibrary.length === 1 ? '' : 's'}`,
+    },
+    {
+      label: 'Ownership',
+      value: dashboardOwnerPrincipalKey ?? 'Starter seed',
+      detail:
+        persistedDashboardVersion != null
+          ? `v${persistedDashboardVersion} · ${persistedDashboardVersionStatus ?? 'status unavailable'}`
+          : 'Not persisted yet',
+    },
+  ];
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
   const heroSummary =
     overview?.summary ??
@@ -1885,6 +1910,15 @@ function App() {
               preserves their placement order, and executes each supported panel through the live
               query execution API.
             </p>
+            <div className="runtimeSnapshot" aria-label="Dashboard runtime summary">
+              {runtimeSnapshotCards.map((card) => (
+                <article className="runtimeSnapshotCard" key={card.label}>
+                  <span className="runtimeSnapshotLabel">{card.label}</span>
+                  <strong>{card.value}</strong>
+                  <p className="runtimeMeta">{card.detail}</p>
+                </article>
+              ))}
+            </div>
             <div className="runtimeToolbar">
               <p className="runtimeMeta">{dashboardSourceLabel} · {dashboardDocument.key}</p>
               {activeDashboardPage ? (
