@@ -546,6 +546,25 @@ h1 {
   margin-top: 2px;
 }
 
+.runtimeStarterHistorySummary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  align-items: baseline;
+}
+
+.runtimeStarterHistorySummary strong {
+  font-size: 0.79rem;
+  color: var(--ink);
+}
+
+.runtimeStarterHistorySummary span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
 .runtimeStarterHistoryItem {
   padding: 10px 12px;
   border-radius: 14px;

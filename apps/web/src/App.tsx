@@ -204,6 +204,69 @@ const runtimeCanvasZoomPercentMin = 85;
 const runtimeCanvasZoomPercentMax = 170;
 const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f'] as const;
 const starterDashboardBootstrapOwnerKey = 'system-bootstrap';
+const starterRefreshHistoryStorageKey = 'flooks.starter-refresh-history';
+
+function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const savedHistory = window.sessionStorage.getItem(starterRefreshHistoryStorageKey);
+
+    if (savedHistory == null) {
+      return [];
+    }
+
+    const parsedHistory = JSON.parse(savedHistory) as unknown;
+
+    if (!Array.isArray(parsedHistory)) {
+      return [];
+    }
+
+    return parsedHistory
+      .flatMap((entry) => {
+        if (
+          entry != null &&
+          typeof entry === 'object' &&
+          'id' in entry &&
+          'summary' in entry &&
+          'detail' in entry &&
+          'timestampLabel' in entry &&
+          'tone' in entry &&
+          typeof entry.id === 'string' &&
+          typeof entry.summary === 'string' &&
+          typeof entry.detail === 'string' &&
+          typeof entry.timestampLabel === 'string' &&
+          (entry.tone === 'success' || entry.tone === 'error')
+        ) {
+          return [entry satisfies StarterRefreshHistoryEntry];
+        }
+
+        return [];
+      })
+      .slice(0, 4);
+  } catch {
+    return [];
+  }
+}
+
+function persistStarterRefreshHistory(history: StarterRefreshHistoryEntry[]): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (history.length === 0) {
+      window.sessionStorage.removeItem(starterRefreshHistoryStorageKey);
+      return;
+    }
+
+    window.sessionStorage.setItem(starterRefreshHistoryStorageKey, JSON.stringify(history));
+  } catch {
+    return;
+  }
+}
 
 function isScorecardPanel(
   panel: PanelRef | undefined,
@@ -656,7 +719,9 @@ function App() {
   );
   const [dashboardOwnerPrincipalKey, setDashboardOwnerPrincipalKey] = useState<string | null>(null);
   const [starterRefreshOutcome, setStarterRefreshOutcome] = useState<StarterRefreshOutcome>(null);
-  const [starterRefreshHistory, setStarterRefreshHistory] = useState<StarterRefreshHistoryEntry[]>([]);
+  const [starterRefreshHistory, setStarterRefreshHistory] = useState<StarterRefreshHistoryEntry[]>(() =>
+    loadStarterRefreshHistory(),
+  );
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
   const [runtimeCanvasZoomPercent, setRuntimeCanvasZoomPercent] = useState<number>(
@@ -942,6 +1007,10 @@ function App() {
       controller.abort();
     };
   }, []);
+
+  useEffect(() => {
+    persistStarterRefreshHistory(starterRefreshHistory);
+  }, [starterRefreshHistory]);
 
   useEffect(() => {
     setActivePageId((currentPageId) => {
@@ -1403,6 +1472,10 @@ function App() {
                 ) : null}
                 {starterRefreshHistory.length > 0 ? (
                   <div className="runtimeStarterHistory" aria-label="Recent starter refresh actions">
+                    <div className="runtimeStarterHistorySummary">
+                      <strong>Recent starter actions</strong>
+                      <span>Persists for this browser session</span>
+                    </div>
                     {starterRefreshHistory.map((entry) => (
                       <article
                         className={`runtimeStarterHistoryItem${entry.tone === 'error' ? ' runtimeStarterHistoryItemError' : ''}`}
