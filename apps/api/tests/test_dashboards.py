@@ -63,6 +63,23 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert created_body["latestVersionNumber"] == 1
     assert created_body["latestVersionStatus"] == "draft"
     assert created_body["versions"][0]["summary"] == "Initial bootstrap version."
+    assert created_body["document"]["panelLibrary"][0]["query"] == {
+        "datasetKey": "mart_commerce_daily",
+        "dimensions": [],
+        "metrics": [{"key": "gmv", "aggregate": "sum"}],
+        "sort": [],
+        "limit": 1,
+    }
+    assert created_body["document"]["panelLibrary"][0]["scorecard"] == {
+        "description": "Total GMV from the stored dashboard document.",
+        "valueField": "gmv",
+        "valuePrefix": "$",
+        "valueSuffix": None,
+    }
+    assert created_body["document"]["panelLibrary"][1]["table"] == {
+        "description": "Top channels by revenue from the stored dashboard document.",
+        "columns": ["channel_name", "revenue"],
+    }
 
     list_response = dashboard_client.get("/api/v1/dashboards")
 
@@ -91,6 +108,10 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert updated_body["latestVersionNumber"] == 2
     assert updated_body["latestVersionStatus"] == "published"
     assert [version["versionNumber"] for version in updated_body["versions"]] == [1, 2]
+    assert updated_body["document"]["panelLibrary"][0]["scorecard"]["valueField"] == "gmv"
+    assert updated_body["document"]["panelLibrary"][1]["query"]["sort"] == [
+        {"field": "revenue", "direction": "desc"}
+    ]
 
     version_one_response = dashboard_client.get("/api/v1/dashboards/commerce-home", params={"version": 1})
 
@@ -154,6 +175,14 @@ def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key
                         "width": 300,
                         "height": 180,
                         "zIndex": 1,
+                    },
+                    {
+                        "panelId": "panel-channel-table",
+                        "x": 40,
+                        "y": 240,
+                        "width": 920,
+                        "height": 320,
+                        "zIndex": 1,
                     }
                 ],
             }
@@ -166,6 +195,36 @@ def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key
                 "title": "GMV",
                 "datasetKey": "mart_commerce_daily",
                 "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": [],
+                    "metrics": [{"key": "gmv", "aggregate": "sum"}],
+                    "limit": 1,
+                },
+                "scorecard": {
+                    "description": "Total GMV from the stored dashboard document.",
+                    "valueField": "gmv",
+                    "valuePrefix": "$",
+                },
+            },
+            {
+                "id": "panel-channel-table",
+                "key": "channel-revenue-table",
+                "kind": "table",
+                "title": "Revenue by Channel",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": ["channel_name"],
+                    "metrics": [{"key": "revenue", "aggregate": "sum"}],
+                    "sort": [{"field": "revenue", "direction": "desc"}],
+                    "limit": 5,
+                },
+                "table": {
+                    "description": "Top channels by revenue from the stored dashboard document.",
+                    "columns": ["channel_name", "revenue"],
+                },
             }
         ],
     }

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import DataSourceKind, SystemRole
 from app.domain.persistence import DashboardVersionStatus, PrincipalKind
+from app.domain.query import MetricAggregate, SortDirection
 
 PanelKind = Literal["table", "scorecard", "line", "bar", "pie", "notice"]
 
@@ -54,6 +55,36 @@ class DashboardPage(DashboardModel):
     placements: list[DashboardPanelPlacement] = Field(default_factory=list)
 
 
+class DashboardPanelMetricSpec(DashboardModel):
+    key: str
+    aggregate: MetricAggregate
+
+
+class DashboardPanelSortSpec(DashboardModel):
+    field: str
+    direction: SortDirection
+
+
+class DashboardPanelQuerySpec(DashboardModel):
+    dataset_key: str
+    dimensions: list[str] = Field(default_factory=list)
+    metrics: list[DashboardPanelMetricSpec] = Field(min_length=1)
+    sort: list[DashboardPanelSortSpec] = Field(default_factory=list)
+    limit: int | None = Field(default=None, ge=1, le=50_000)
+
+
+class DashboardScorecardPanelConfig(DashboardModel):
+    description: str
+    value_field: str
+    value_prefix: str | None = None
+    value_suffix: str | None = None
+
+
+class DashboardTablePanelConfig(DashboardModel):
+    description: str
+    columns: list[str] = Field(min_length=1)
+
+
 class DashboardPanelRef(DashboardModel):
     id: str
     key: str
@@ -61,6 +92,9 @@ class DashboardPanelRef(DashboardModel):
     title: str
     dataset_key: str
     by_reference: bool
+    query: DashboardPanelQuerySpec | None = None
+    scorecard: DashboardScorecardPanelConfig | None = None
+    table: DashboardTablePanelConfig | None = None
 
 
 class DashboardDocument(DashboardModel):

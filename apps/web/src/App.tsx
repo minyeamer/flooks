@@ -4,6 +4,7 @@ import {
   dataSourceKinds,
   starterDashboard,
   systemRoles,
+  type DashboardDocument,
   type PanelRef,
 } from '@flooks/dashboard-schema';
 
@@ -91,6 +92,13 @@ type ApiReferenceResponse = {
   endpoints: ApiEndpointReference[];
 };
 
+type DashboardApiResponse = {
+  slug: string;
+  title: string;
+  latestVersionNumber: number;
+  document: DashboardDocument;
+};
+
 type QueryResultValue = string | number | boolean;
 
 type QueryExecutionRow = Record<string, QueryResultValue>;
@@ -134,19 +142,6 @@ function isTablePanel(
 } {
   return panel?.kind === 'table' && panel.query != null && panel.table != null;
 }
-
-const starterDashboardPanelsById = new Map(
-  starterDashboard.panelLibrary.map((panel) => [panel.id, panel]),
-);
-
-const starterDashboardRuntimePanels =
-  starterDashboard.pages[0]?.placements
-    .map((placement) => starterDashboardPanelsById.get(placement.panelId))
-    .filter((panel): panel is PanelRef => panel != null) ?? [];
-
-const starterDashboardScorecardPanels = starterDashboardRuntimePanels.filter(isScorecardPanel);
-
-const starterDashboardTablePanel = starterDashboardRuntimePanels.find(isTablePanel) ?? null;
 
 const launchTracks = [
   {
@@ -244,8 +239,22 @@ function formatScorecardValue(
   return `${valuePrefix ?? ''}${formattedValue}${valueSuffix ?? ''}`;
 }
 
-function buildInitialPanelRuntime(): Record<string, PanelRuntimeEntry> {
-  return starterDashboardRuntimePanels.reduce<Record<string, PanelRuntimeEntry>>((state, panel) => {
+function getDashboardRuntimePanels(dashboardDocument: DashboardDocument): PanelRef[] {
+  const firstPage = dashboardDocument.pages[0];
+
+  if (firstPage == null) {
+    return [];
+  }
+
+  const panelsById = new Map(dashboardDocument.panelLibrary.map((panel) => [panel.id, panel]));
+
+  return firstPage.placements
+    .map((placement) => panelsById.get(placement.panelId))
+    .filter((panel): panel is PanelRef => panel != null);
+}
+
+function buildInitialPanelRuntime(dashboardDocument: DashboardDocument): Record<string, PanelRuntimeEntry> {
+  return getDashboardRuntimePanels(dashboardDocument).reduce<Record<string, PanelRuntimeEntry>>((state, panel) => {
     if (panel.query != null) {
       state[panel.id] = {
         state: 'loading',
@@ -282,8 +291,11 @@ function App() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [apiReference, setApiReference] = useState<ApiReferenceResponse | null>(null);
+  const [dashboardDocument, setDashboardDocument] = useState<DashboardDocument>(starterDashboard);
+  const [dashboardSourceLabel, setDashboardSourceLabel] = useState<string>('Starter seed');
+  const [dashboardNotice, setDashboardNotice] = useState<string | null>(null);
   const [panelRuntime, setPanelRuntime] = useState<Record<string, PanelRuntimeEntry>>(() =>
-    buildInitialPanelRuntime(),
+    buildInitialPanelRuntime(starterDashboard),
   );
   const [requestState, setRequestState] = useState<RequestState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -342,10 +354,75 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
 
-    async function loadDashboardRuntimePanels() {
-      setPanelRuntime(buildInitialPanelRuntime());
+    async function loadDashboardDocument() {
+      try {
+        setDashboardNotice(null);
 
-      for (const panel of starterDashboardRuntimePanels) {
+        const response = await fetch(`${API_BASE_URL}/dashboards/${starterDashboard.key}`, {
+          signal: controller.signal,
+        });
+
+        if (response.status === 404) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          setDashboardDocument(starterDashboard);
+          setDashboardSourceLabel('Starter seed');
+          setDashboardNotice(
+            `Persisted dashboard '${starterDashboard.key}' was not found yet. Using the starter document.`,
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            await getResponseMessage(
+              response,
+              `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
+            ),
+          );
+        }
+
+        const payload = (await response.json()) as DashboardApiResponse;
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setDashboardDocument(payload.document);
+        setDashboardSourceLabel(`Persisted v${payload.latestVersionNumber}`);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setDashboardDocument(starterDashboard);
+        setDashboardSourceLabel('Starter seed');
+        setDashboardNotice(
+          error instanceof Error
+            ? error.message
+            : `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
+        );
+      }
+    }
+
+    void loadDashboardDocument();
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadDashboardRuntimePanels() {
+      const runtimePanels = getDashboardRuntimePanels(dashboardDocument);
+
+      setPanelRuntime(buildInitialPanelRuntime(dashboardDocument));
+
+      for (const panel of runtimePanels) {
         if (panel.query == null) {
           continue;
         }
@@ -408,11 +485,14 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [dashboardDocument]);
 
   const liveRoles = system?.roles ?? systemRoles;
   const liveDataSources = system?.dataSources ?? dataSourceKinds;
   const liveModules = system?.modules ?? [];
+  const dashboardRuntimePanels = getDashboardRuntimePanels(dashboardDocument);
+  const dashboardScorecardPanels = dashboardRuntimePanels.filter(isScorecardPanel);
+  const dashboardTablePanel = dashboardRuntimePanels.find(isTablePanel) ?? null;
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
   const heroSummary =
     overview?.summary ??
@@ -435,7 +515,7 @@ function App() {
         </div>
         <div className="heroCard">
           <span className="heroCardLabel">Live Bootstrap</span>
-          <strong>{overview?.product ?? starterDashboard.title}</strong>
+          <strong>{overview?.product ?? dashboardDocument.title}</strong>
           <span>
             {overview
               ? `${overview.metrics.length} live metrics · ${overview.execution_plan.length} planned slices`
@@ -444,7 +524,7 @@ function App() {
           <span>
             {system
               ? `${liveModules.length} modules · ${liveRoles.length} roles · ${liveDataSources.length} sources`
-              : starterDashboard.supportedDataSources.join(', ')}
+              : dashboardDocument.supportedDataSources.join(', ')}
           </span>
         </div>
       </header>
@@ -699,10 +779,12 @@ function App() {
               The web shell now reads first-party panel definitions from the starter dashboard document
               and executes each scorecard/table panel through the live query execution API.
             </p>
+            <p className="runtimeMeta">{dashboardSourceLabel} · {dashboardDocument.key}</p>
           </div>
+          {dashboardNotice ? <p className="callout">{dashboardNotice}</p> : null}
           <div className="runtimeLayout">
             <div className="runtimeStats">
-              {starterDashboardScorecardPanels.map((panel) => {
+              {dashboardScorecardPanels.map((panel) => {
                 const runtime = panelRuntime[panel.id];
                 const value = runtime?.data?.results[0]?.[panel.scorecard.valueField];
 
@@ -738,24 +820,31 @@ function App() {
               })}
             </div>
 
-            {starterDashboardTablePanel ? (
+            {dashboardRuntimePanels.length === 0 ? (
+              <p className="callout">
+                The active dashboard document does not define any scorecard or table panels with a governed
+                query spec yet.
+              </p>
+            ) : null}
+
+            {dashboardTablePanel ? (
               <div className="runtimeTableCard">
                 <div className="runtimeTableHeader">
-                  <span className="kicker">{starterDashboardTablePanel.title}</span>
+                  <span className="kicker">{dashboardTablePanel.title}</span>
                   <span className="queryBadge">
-                    {starterDashboardTablePanel.datasetKey} · top {starterDashboardTablePanel.query.limit ?? 0}
+                    {dashboardTablePanel.datasetKey} · top {dashboardTablePanel.query.limit ?? 0}
                   </span>
                 </div>
-                <p className="runtimeMeta">{starterDashboardTablePanel.table.description}</p>
+                <p className="runtimeMeta">{dashboardTablePanel.table.description}</p>
 
-                {panelRuntime[starterDashboardTablePanel.id]?.state === 'ready' &&
-                panelRuntime[starterDashboardTablePanel.id]?.data ? (
-                  (panelRuntime[starterDashboardTablePanel.id]?.data?.results.length ?? 0) > 0 ? (
+                {panelRuntime[dashboardTablePanel.id]?.state === 'ready' &&
+                panelRuntime[dashboardTablePanel.id]?.data ? (
+                  (panelRuntime[dashboardTablePanel.id]?.data?.results.length ?? 0) > 0 ? (
                     <div className="queryTableWrap">
                       <table className="queryTable">
                         <thead>
                           <tr>
-                            {starterDashboardTablePanel.table.columns.map((column) => (
+                            {dashboardTablePanel.table.columns.map((column) => (
                               <th key={column} scope="col">
                                 {column}
                               </th>
@@ -763,9 +852,9 @@ function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {panelRuntime[starterDashboardTablePanel.id]?.data?.results.map((row, index) => (
+                          {panelRuntime[dashboardTablePanel.id]?.data?.results.map((row, index) => (
                             <tr key={`row-${index}`}>
-                              {starterDashboardTablePanel.table.columns.map((column) => (
+                              {dashboardTablePanel.table.columns.map((column) => (
                                 <td key={`${index}-${column}`}>{formatQueryCellValue(row[column])}</td>
                               ))}
                             </tr>
@@ -776,14 +865,14 @@ function App() {
                   ) : (
                     <p className="callout">The table panel executed successfully, but the dataset returned no rows.</p>
                   )
-                ) : panelRuntime[starterDashboardTablePanel.id]?.state === 'error' ? (
+                ) : panelRuntime[dashboardTablePanel.id]?.state === 'error' ? (
                   <p className="callout calloutError">
-                    {panelRuntime[starterDashboardTablePanel.id]?.errorMessage ??
+                    {panelRuntime[dashboardTablePanel.id]?.errorMessage ??
                       'The table panel could not be rendered yet.'}
                   </p>
                 ) : (
                   <p className="callout">
-                    Executing the starter dashboard table panel against {API_BASE_URL}/query/execute
+                    Executing the active dashboard table panel against {API_BASE_URL}/query/execute
                   </p>
                 )}
               </div>
@@ -795,19 +884,20 @@ function App() {
           <div className="panelHeader">
             <span className="chip">Dashboard Document</span>
             <h2>Page and library seed data</h2>
+            <p className="runtimeMeta">{dashboardSourceLabel}</p>
           </div>
           <div className="documentPreview">
             <div>
               <h3>Pages</h3>
               <p>
-                {starterDashboard.pages[0]?.title} · {starterDashboard.pages[0]?.width}×
-                {starterDashboard.pages[0]?.height}px
+                {dashboardDocument.pages[0]?.title} · {dashboardDocument.pages[0]?.width}×
+                {dashboardDocument.pages[0]?.height}px
               </p>
             </div>
             <div>
               <h3>Panel Library</h3>
               <p>
-                {starterDashboard.panelLibrary
+                {dashboardDocument.panelLibrary
                   .map((panel) => `${panel.title} (${panel.kind})`)
                   .join(' / ')}
               </p>
