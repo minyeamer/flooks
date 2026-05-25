@@ -313,6 +313,24 @@ Validation:
 - `npm run build:web`
 - `POST /api/v1/dashboards` with a temporary clone of `commerce-home`, followed by `DELETE /api/v1/dashboards/commerce-home-delete-...` and a `404` check on `GET /api/v1/dashboards/{slug}`
 
+## 8f31e41f · Clarify dashboard delete risks
+
+Intent: make destructive cleanup in the web shell safer by showing operators exactly which dashboard, how many revisions, and which fallback target will be affected before they confirm a delete.
+
+What changed:
+- `apps/web/src/App.tsx` now derives delete-target metadata from the selected dashboard summary, including persisted revision count, latest status, owner key, and formatted update time.
+- `apps/web/src/App.tsx` expanded the `Delete selected dashboard` card to show that metadata inline even before confirmation, so the operator can verify the target without scanning the directory grid.
+- `apps/web/src/App.tsx` now renders an armed-state warning panel that explicitly names the dashboard title/slug, the number of persisted revisions being removed, and the slug the shell will fall back to after deletion.
+- `apps/web/src/styles.css` added a dedicated warning surface for the armed delete state so the destructive path reads differently from the create and revision composers.
+
+Functional result:
+- The shell now gives operators a much clearer last-chance review before a destructive dashboard delete.
+- The fallback behavior after delete is visible before confirmation instead of only being inferred from the code path.
+- Dashboard lifecycle controls remain on one surface, but the dangerous path is now visually and semantically separated from ordinary create/update actions.
+
+Validation:
+- `npm run build:web`
+
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
