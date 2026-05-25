@@ -414,6 +414,24 @@ Functional result:
 Validation:
 - `npm run build:web`
 
+## a83f96fa · Add editor selection and keyboard nudging
+
+Intent: reduce mouse-only friction in the dashboard editor by making panel selection explicit and allowing fine placement adjustment from the keyboard.
+
+What changed:
+- `apps/web/src/App.tsx` now tracks the currently selected panel in `/dashboards/{slug}/edit`, initializes that selection from the active page, and clears it when the editor route is exited or the operator clicks empty canvas space.
+- `apps/web/src/App.tsx` now focuses the canvas scroller during drag/resize interactions so keyboard shortcuts apply to the editor immediately after a panel is touched.
+- `apps/web/src/App.tsx` extends the existing canvas key handler so the editor route supports `Arrow` keys for one-grid-step nudging on the selected panel and `Escape` to clear selection, while preserving the existing zoom shortcuts.
+- `apps/web/src/styles.css` now renders a visible selection outline so the active editor target is obvious before a nudge or resize is applied.
+
+Functional result:
+- Operators can now make smaller layout adjustments without dragging by repeatedly nudging the selected panel one `snapGrid` step at a time.
+- Selection state is visible and explicit, which makes the editor safer once multiple similarly sized cards are on the same page.
+- The keyboard path stays scoped to the editor route and does not alter the runtime-only dashboard view behavior.
+
+Validation:
+- `npm run build:web`
+
 ## ed342abe · Validate dashboard manifest contracts
 
 Intent: move the manifest/catalog milestone into the dashboard write path so invalid panel queries are rejected when a dashboard is created or versioned instead of failing later at runtime.

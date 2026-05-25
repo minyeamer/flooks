@@ -1257,6 +1257,7 @@ function App() {
   const [latestDashboardDocument, setLatestDashboardDocument] = useState<DashboardDocument | null>(null);
   const [layoutEditorDocument, setLayoutEditorDocument] = useState<DashboardDocument | null>(null);
   const [layoutEditorDragState, setLayoutEditorDragState] = useState<LayoutEditorDragState | null>(null);
+  const [selectedLayoutEditorPanelId, setSelectedLayoutEditorPanelId] = useState<string | null>(null);
   const [isLayoutEditorDirty, setIsLayoutEditorDirty] = useState<boolean>(false);
   const [activePageId, setActivePageId] = useState<string | null>(() =>
     getDefaultDashboardPageId(starterDashboard),
@@ -1951,6 +1952,8 @@ function App() {
     }
 
     event.preventDefault();
+    setSelectedLayoutEditorPanelId(placement.panelId);
+    (event.currentTarget.closest('.runtimeCanvasScroller') as HTMLDivElement | null)?.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
     setLayoutEditorDragState({
       mode: 'move',
@@ -1977,6 +1980,8 @@ function App() {
 
     event.preventDefault();
     event.stopPropagation();
+    setSelectedLayoutEditorPanelId(placement.panelId);
+    (event.currentTarget.closest('.runtimeCanvasScroller') as HTMLDivElement | null)?.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
     setLayoutEditorDragState({
       mode: 'resize',
@@ -2080,6 +2085,10 @@ function App() {
       setLayoutEditorDragState(null);
       setIsLayoutEditorDirty(false);
     }
+  }
+
+  function handleClearLayoutEditorSelection(): void {
+    setSelectedLayoutEditorPanelId(null);
   }
 
   async function handleCreateDashboard(): Promise<void> {
@@ -2319,6 +2328,60 @@ function App() {
       return;
     }
 
+    if (
+      currentShellSurface === 'dashboard-editor' &&
+      activeDashboardPage != null &&
+      selectedLayoutEditorPanelId != null
+    ) {
+      const selectedPlacement = activeDashboardPage.placements.find(
+        (placement) => placement.panelId === selectedLayoutEditorPanelId,
+      );
+
+      if (selectedPlacement != null) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          handleClearLayoutEditorSelection();
+          return;
+        }
+
+        if (
+          event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'ArrowDown'
+        ) {
+          event.preventDefault();
+
+          const deltaX =
+            event.key === 'ArrowLeft'
+              ? -activeDashboardPage.snapGrid.columnWidth
+              : event.key === 'ArrowRight'
+                ? activeDashboardPage.snapGrid.columnWidth
+                : 0;
+          const deltaY =
+            event.key === 'ArrowUp'
+              ? -activeDashboardPage.snapGrid.rowHeight
+              : event.key === 'ArrowDown'
+                ? activeDashboardPage.snapGrid.rowHeight
+                : 0;
+
+          updateLayoutEditorPlacement(activeDashboardPage, selectedPlacement, {
+            x: clampGridValue(
+              selectedPlacement.x + deltaX,
+              0,
+              activeDashboardPage.width - selectedPlacement.width,
+            ),
+            y: clampGridValue(
+              selectedPlacement.y + deltaY,
+              0,
+              activeDashboardPage.height - selectedPlacement.height,
+            ),
+          });
+          return;
+        }
+      }
+    }
+
     if (event.key === '+' || event.key === '=') {
       event.preventDefault();
       stepRuntimeCanvasZoom('in');
@@ -2472,13 +2535,15 @@ function App() {
   useEffect(() => {
     if (currentShellSurface !== 'dashboard-editor') {
       setLayoutEditorDragState(null);
+      setSelectedLayoutEditorPanelId(null);
       return;
     }
 
     setLayoutEditorDocument(structuredClone(dashboardDocument));
     setLayoutEditorDragState(null);
+    setSelectedLayoutEditorPanelId(getActiveDashboardPage(dashboardDocument, activePageId)?.placements[0]?.panelId ?? null);
     setIsLayoutEditorDirty(false);
-  }, [currentShellSurface, dashboardDocument]);
+  }, [activePageId, currentShellSurface, dashboardDocument]);
 
   useEffect(() => {
     persistStarterRefreshHistory(starterRefreshHistory);
@@ -3055,6 +3120,10 @@ function App() {
   const isDashboardEditorRoute = currentShellSurface === 'dashboard-editor';
   const currentDashboardRuntimePath = buildDashboardRuntimePath(selectedDashboardSlug);
   const currentDashboardEditorPath = buildDashboardEditorPath(selectedDashboardSlug);
+  const selectedLayoutEditorPanel =
+    activeDashboardPage?.placements.find((placement) => placement.panelId === selectedLayoutEditorPanelId) != null
+      ? canvasDashboardDocument.panelLibrary.find((panel) => panel.id === selectedLayoutEditorPanelId) ?? null
+      : null;
   const currentSurfaceLabel =
     currentShellSurface === 'dashboards'
       ? 'Dashboard directory'
@@ -4328,6 +4397,11 @@ function App() {
                       ? 'Unsaved layout changes are isolated to this editor route until you save a new version.'
                       : 'Drag panels to move them, use the resize handle to change size, then save the layout as a new dashboard version.'}
                   </p>
+                  <p className="runtimeMeta">
+                    {selectedLayoutEditorPanel != null
+                      ? `Selected ${selectedLayoutEditorPanel.title} · Arrow keys nudge by one grid step · Esc clears selection.`
+                      : 'Select a panel to nudge it with the arrow keys.'}
+                  </p>
                   <div className="runtimeControlGroup" aria-label="Layout editor actions">
                     <button
                       type="button"
@@ -4619,6 +4693,15 @@ function App() {
                   aria-label="Runtime canvas preview"
                   onKeyDown={handleRuntimeCanvasKeyDown}
                   onWheel={handleRuntimeCanvasWheel}
+                  onPointerDown={(event) => {
+                    if (
+                      isDashboardEditorRoute &&
+                      (event.target === event.currentTarget ||
+                        (event.target instanceof HTMLDivElement && event.target.classList.contains('runtimeCanvas')))
+                    ) {
+                      handleClearLayoutEditorSelection();
+                    }
+                  }}
                   tabIndex={0}
                 >
                   <div
@@ -4639,7 +4722,9 @@ function App() {
                         isDashboardEditorRoute &&
                         layoutEditorDragState?.panelId === panel.id &&
                         layoutEditorDragState.mode === 'resize';
-                      const runtimeCanvasItemClassName = `${isDashboardEditorRoute ? ' runtimeCanvasItemEditor' : ''}${isDraggingEditorPanel ? ' runtimeCanvasItemDragging' : ''}${isResizingEditorPanel ? ' runtimeCanvasItemResizing' : ''}`;
+                      const isSelectedEditorPanel =
+                        isDashboardEditorRoute && selectedLayoutEditorPanelId === panel.id;
+                      const runtimeCanvasItemClassName = `${isDashboardEditorRoute ? ' runtimeCanvasItemEditor' : ''}${isSelectedEditorPanel ? ' runtimeCanvasItemSelected' : ''}${isDraggingEditorPanel ? ' runtimeCanvasItemDragging' : ''}${isResizingEditorPanel ? ' runtimeCanvasItemResizing' : ''}`;
                       const editorPointerHandlers = isDashboardEditorRoute
                         ? {
                             onPointerDown: (event: ReactPointerEvent<HTMLElement>) =>

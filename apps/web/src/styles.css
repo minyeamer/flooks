@@ -773,6 +773,11 @@ h1 {
   touch-action: none;
 }
 
+.runtimeCanvasItemSelected {
+  outline: 2px solid rgba(15, 118, 110, 0.55);
+  outline-offset: 4px;
+}
+
 .runtimeCanvasItemDragging {
   cursor: grabbing;
   transform: translateY(-2px);
