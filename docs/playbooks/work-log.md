@@ -350,6 +350,26 @@ Validation:
 - `npm run build:web`
 - `POST /api/v1/dashboards` with a temporary clone of `commerce-home`, followed by `PUT /api/v1/dashboards/{slug}` to create `published` and `archived` revisions and a final status check showing `v1:draft, v2:published, v3:archived`
 
+## c1801302 · Summarize dashboard lifecycle state
+
+Intent: make publish/archive history readable at the dashboard-directory level instead of forcing operators to load detail and inspect version history before they understand a dashboard's lifecycle state.
+
+What changed:
+- `apps/api/app/domain/dashboard.py` extended `DashboardSummary` / `DashboardResponse` with lifecycle aggregate fields for published and archived revision history.
+- `apps/api/app/api/routes/dashboards.py` now computes published and archived revision counts plus the latest published/archived version numbers directly from the stored version records when building dashboard summaries.
+- `apps/api/tests/test_dashboards.py` added assertions that create, list, and update responses expose the new lifecycle aggregate fields correctly as dashboards move from `draft` to `published`.
+- `apps/api/app/api/routes/reference.py` updated the structured API reference so the web-visible documentation reflects the expanded dashboard summary contract.
+- `apps/web/src/App.tsx` now reads the new summary fields and surfaces `Published vN` and archived-history tags directly on dashboard directory cards.
+
+Functional result:
+- Operators can see whether a dashboard has published history or archived revisions before opening its detail view.
+- The dashboard directory now communicates lifecycle progress more directly, which makes the create/publish/archive/delete controls feel like one coherent surface instead of isolated actions.
+- The structured API reference stays aligned with the live dashboard contract, so the web-visible documentation does not lag behind the implementation.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
+- `npm run build:web`
+
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
