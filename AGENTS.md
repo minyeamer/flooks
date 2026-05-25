@@ -39,6 +39,15 @@ FLooks is an internal-first enterprise dashboard platform. Prioritize governed d
 - Wrap file paths, variables, environment variables, commands, and identifiers in backticks inside the message body.
 - If the user asks for a draft only, provide the message without creating the commit.
 
+## Work log rules
+
+- Maintain `docs/playbooks/work-log.md` as the canonical English implementation log for this repository.
+- After committed work, append or update one entry per commit in `docs/playbooks/work-log.md` before closing the task when practical.
+- Each entry must explain enough for another engineer to reproduce a similar slice from a clean folder: state the intent, the key files or modules changed, the API/UI/schema behavior that changed, and the validation that proved it worked.
+- Do not treat the commit subject or commit body alone as a sufficient work log. Rewrite the change in plain English with concrete implementation detail.
+- Keep the writing compact and changelog-like, but not shallow. Avoid ornate document structure; preserve implementation detail.
+- If local work is not committed yet, label it explicitly as pending local changes instead of presenting it as a completed commit entry.
+
 ## Documentation rules
 
 - Capture architectural decisions in `docs/adr`

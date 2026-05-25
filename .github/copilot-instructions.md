@@ -35,3 +35,12 @@
 - When a commit body uses list items, start each item with a capital letter and end it with a period.
 - Use backticks for file paths, variables, environment variables, commands, and identifiers inside the message body.
 - If the user requests only a draft message, do not create the commit.
+
+## Work log output
+
+- Save the canonical English implementation log in `docs/playbooks/work-log.md`.
+- After committed work, append or update one entry per commit in `docs/playbooks/work-log.md` before closing the task when practical.
+- Each entry must be detailed enough that another engineer could reproduce a similar result from a clean folder: include intent, key files or modules, concrete behavior changes, and validation.
+- A commit message by itself is not an acceptable substitute for the work log. Rewrite the implementation in clear English.
+- Keep the log concise and changelog-like, but preserve the technical detail needed to rebuild the feature.
+- If work is still local and uncommitted, separate it clearly as pending work instead of mixing it into committed history.
