@@ -275,6 +275,24 @@ Functional result:
 Validation:
 - `npm run build:web`
 
+## e2a32c51 · Layout-aware runtime preview
+
+Intent: make the active dashboard page preview reflect stored placement coordinates more directly instead of only showing panels in placement order.
+
+What changed:
+- `apps/web/src/App.tsx` added runtime grid helpers that derive column count, row count, and preview row sizing from the active page's `snapGrid`, width, and height.
+- `apps/web/src/App.tsx` now converts each panel placement into grid start and span values, then passes those values into the runtime preview as CSS custom properties.
+- `apps/web/src/App.tsx` keeps the existing active-page runtime execution flow but now renders each panel card inside a layout-aware canvas so the preview is closer to the stored page arrangement.
+- `apps/web/src/styles.css` added the runtime canvas/grid rules that consume the placement custom properties on desktop and collapse back to a safe single-column stack on smaller screens.
+
+Functional result:
+- The active page preview now uses stored `x`, `y`, `width`, and `height` values to approximate the original dashboard layout.
+- Multi-panel pages are easier to inspect because the runtime shell no longer treats every panel as the same generic card slot.
+- Mobile rendering stays readable because the preview still falls back to a stacked layout below the desktop breakpoint.
+
+Validation:
+- `npm run build:web`
+
 ## f200b7b3 · Placement-aware runtime panel rendering
 
 Intent: stop dropping active-page layout information after panel execution so the shell can render more than one table panel and keep the runtime aligned with the selected page's stored placements.
