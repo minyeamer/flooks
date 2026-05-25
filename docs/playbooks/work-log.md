@@ -275,6 +275,25 @@ Functional result:
 Validation:
 - `npm run build:web`
 
+## f200b7b3 · Placement-aware runtime panel rendering
+
+Intent: stop dropping active-page layout information after panel execution so the shell can render more than one table panel and keep the runtime aligned with the selected page's stored placements.
+
+What changed:
+- `apps/web/src/App.tsx` replaced the panel-selection helper with a placement-aware runtime entry helper that keeps both the active page placement metadata and the linked panel definition together.
+- `apps/web/src/App.tsx` now initializes query runtime state and executes panel queries from that runtime entry list, so the execution path stays aligned with the same active-page ordering used for rendering.
+- `apps/web/src/App.tsx` removed the separate `dashboardScorecardPanels` and first-`dashboardTablePanel` render split and now renders each active-page runtime entry in order, including multiple table panels when present.
+- `apps/web/src/App.tsx` also leaves unsupported panel kinds visible as placeholder cards instead of silently omitting them from the page preview.
+- `apps/web/src/styles.css` added the grid and full-width card rules for the new runtime panel list so scorecards and table-style panels still read cleanly in the shell.
+
+Functional result:
+- The active dashboard page can now render all supported scorecard and table panels instead of only the first table plus a scorecard group.
+- The runtime preview follows stored placement order more closely, which makes multi-panel pages easier to inspect from the existing shell.
+- Newly introduced panel kinds are at least visible as placeholders until a dedicated renderer is added.
+
+Validation:
+- `npm run build:web`
+
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
