@@ -5,6 +5,7 @@ import {
   starterDashboard,
   systemRoles,
   type DashboardDocument,
+  type PanelPlacement,
   type PanelRef,
 } from '@flooks/dashboard-schema';
 
@@ -119,6 +120,11 @@ type PanelRuntimeEntry = {
   state: RequestState;
   data: QueryExecutionResponse | null;
   errorMessage: string | null;
+};
+
+type RuntimePanelEntry = {
+  panel: PanelRef;
+  placement: PanelPlacement;
 };
 
 const numberFormatter = new Intl.NumberFormat('en-US');
@@ -239,6 +245,10 @@ function formatScorecardValue(
   return `${valuePrefix ?? ''}${formattedValue}${valueSuffix ?? ''}`;
 }
 
+function formatPlacementLabel(placement: PanelPlacement): string {
+  return `Placement ${placement.x},${placement.y} · ${placement.width}×${placement.height}`;
+}
+
 function getDefaultDashboardPageId(dashboardDocument: DashboardDocument): string | null {
   return dashboardDocument.pages[0]?.id ?? null;
 }
@@ -255,10 +265,10 @@ function getActiveDashboardPage(dashboardDocument: DashboardDocument, pageId: st
   return dashboardDocument.pages[0] ?? null;
 }
 
-function getDashboardRuntimePanels(
+function getDashboardRuntimePanelEntries(
   dashboardDocument: DashboardDocument,
   pageId: string | null,
-): PanelRef[] {
+): RuntimePanelEntry[] {
   const activePage = getActiveDashboardPage(dashboardDocument, pageId);
 
   if (activePage == null) {
@@ -266,18 +276,40 @@ function getDashboardRuntimePanels(
   }
 
   const panelsById = new Map(dashboardDocument.panelLibrary.map((panel) => [panel.id, panel]));
+  const runtimeEntries = activePage.placements.reduce<Array<RuntimePanelEntry & { order: number }>>(
+    (entries, placement, order) => {
+      const panel = panelsById.get(placement.panelId);
 
-  return activePage.placements
-    .map((placement) => panelsById.get(placement.panelId))
-    .filter((panel): panel is PanelRef => panel != null);
+      if (panel != null) {
+        entries.push({
+          panel,
+          placement,
+          order,
+        });
+      }
+
+      return entries;
+    },
+    [],
+  );
+
+  runtimeEntries.sort(
+    (left, right) =>
+      left.placement.y - right.placement.y ||
+      left.placement.x - right.placement.x ||
+      left.placement.zIndex - right.placement.zIndex ||
+      left.order - right.order,
+  );
+
+  return runtimeEntries.map(({ order: _order, ...entry }) => entry);
 }
 
 function buildInitialPanelRuntime(
   dashboardDocument: DashboardDocument,
   pageId: string | null,
 ): Record<string, PanelRuntimeEntry> {
-  return getDashboardRuntimePanels(dashboardDocument, pageId).reduce<Record<string, PanelRuntimeEntry>>(
-    (state, panel) => {
+  return getDashboardRuntimePanelEntries(dashboardDocument, pageId).reduce<Record<string, PanelRuntimeEntry>>(
+    (state, { panel }) => {
       if (panel.query != null) {
         state[panel.id] = {
           state: 'loading',
@@ -459,11 +491,11 @@ function App() {
     const controller = new AbortController();
 
     async function loadDashboardRuntimePanels() {
-      const runtimePanels = getDashboardRuntimePanels(dashboardDocument, activePageId);
+      const runtimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
 
       setPanelRuntime(buildInitialPanelRuntime(dashboardDocument, activePageId));
 
-      for (const panel of runtimePanels) {
+      for (const { panel } of runtimePanelEntries) {
         if (panel.query == null) {
           continue;
         }
@@ -532,9 +564,7 @@ function App() {
   const liveDataSources = system?.dataSources ?? dataSourceKinds;
   const liveModules = system?.modules ?? [];
   const activeDashboardPage = getActiveDashboardPage(dashboardDocument, activePageId);
-  const dashboardRuntimePanels = getDashboardRuntimePanels(dashboardDocument, activePageId);
-  const dashboardScorecardPanels = dashboardRuntimePanels.filter(isScorecardPanel);
-  const dashboardTablePanel = dashboardRuntimePanels.find(isTablePanel) ?? null;
+  const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
   const heroSummary =
     overview?.summary ??
@@ -818,8 +848,9 @@ function App() {
             <span className="chip">Live Panel Runtime</span>
             <h2>Active dashboard page preview</h2>
             <p className="sectionSummary">
-              The web shell reads first-party panel definitions from the active dashboard page and
-              executes each scorecard or table panel through the live query execution API.
+              The web shell reads first-party panel definitions from the active dashboard page,
+              preserves their placement order, and executes each supported panel through the live
+              query execution API.
             </p>
             <div className="runtimeToolbar">
               <p className="runtimeMeta">{dashboardSourceLabel} · {dashboardDocument.key}</p>
@@ -847,100 +878,121 @@ function App() {
             </div>
           ) : null}
           <div className="runtimeLayout">
-            <div className="runtimeStats">
-              {dashboardScorecardPanels.map((panel) => {
-                const runtime = panelRuntime[panel.id];
-                const value = runtime?.data?.results[0]?.[panel.scorecard.valueField];
-
-                return (
-                  <article className="runtimeStat" key={panel.id}>
-                    <span>{panel.title}</span>
-                    <strong>
-                      {runtime?.state === 'ready'
-                        ? formatScorecardValue(
-                            value,
-                            panel.scorecard.valuePrefix,
-                            panel.scorecard.valueSuffix,
-                          )
-                        : runtime?.state === 'error'
-                          ? 'Unavailable'
-                          : 'Loading'}
-                    </strong>
-                    <p>{panel.scorecard.description}</p>
-                    <p className="runtimeMeta">
-                      {panel.datasetKey} ·{' '}
-                      {runtime?.data?.executionMetadata.connector ?? 'POST /query/execute'}
-                    </p>
-                    <p className="runtimeMeta">
-                      {runtime?.data?.executionMetadata.durationMs != null
-                        ? `${runtime.data.executionMetadata.durationMs} ms`
-                        : 'Awaiting panel result'}
-                    </p>
-                    {runtime?.state === 'error' && runtime.errorMessage ? (
-                      <p className="inlineNotice">{runtime.errorMessage}</p>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-
-            {dashboardRuntimePanels.length === 0 ? (
+            {dashboardRuntimePanelEntries.length === 0 ? (
               <p className="callout">
                 The active dashboard document does not define any scorecard or table panels with a governed
                 query spec yet.
               </p>
-            ) : null}
+            ) : (
+              <div className="runtimePanelList">
+                {dashboardRuntimePanelEntries.map(({ panel, placement }) => {
+                  const runtime = panelRuntime[panel.id];
+                  const runtimePanelKey = `${panel.id}-${placement.x}-${placement.y}-${placement.zIndex}`;
 
-            {dashboardTablePanel ? (
-              <div className="runtimeTableCard">
-                <div className="runtimeTableHeader">
-                  <span className="kicker">{dashboardTablePanel.title}</span>
-                  <span className="queryBadge">
-                    {dashboardTablePanel.datasetKey} · top {dashboardTablePanel.query.limit ?? 0}
-                  </span>
-                </div>
-                <p className="runtimeMeta">{dashboardTablePanel.table.description}</p>
+                  if (isScorecardPanel(panel)) {
+                    const value = runtime?.data?.results[0]?.[panel.scorecard.valueField];
 
-                {panelRuntime[dashboardTablePanel.id]?.state === 'ready' &&
-                panelRuntime[dashboardTablePanel.id]?.data ? (
-                  (panelRuntime[dashboardTablePanel.id]?.data?.results.length ?? 0) > 0 ? (
-                    <div className="queryTableWrap">
-                      <table className="queryTable">
-                        <thead>
-                          <tr>
-                            {dashboardTablePanel.table.columns.map((column) => (
-                              <th key={column} scope="col">
-                                {column}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {panelRuntime[dashboardTablePanel.id]?.data?.results.map((row, index) => (
-                            <tr key={`row-${index}`}>
-                              {dashboardTablePanel.table.columns.map((column) => (
-                                <td key={`${index}-${column}`}>{formatQueryCellValue(row[column])}</td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="callout">The table panel executed successfully, but the dataset returned no rows.</p>
-                  )
-                ) : panelRuntime[dashboardTablePanel.id]?.state === 'error' ? (
-                  <p className="callout calloutError">
-                    {panelRuntime[dashboardTablePanel.id]?.errorMessage ??
-                      'The table panel could not be rendered yet.'}
-                  </p>
-                ) : (
-                  <p className="callout">
-                    Executing the active dashboard table panel against {API_BASE_URL}/query/execute
-                  </p>
-                )}
+                    return (
+                      <article className="runtimeStat" key={runtimePanelKey}>
+                        <span>{panel.title}</span>
+                        <strong>
+                          {runtime?.state === 'ready'
+                            ? formatScorecardValue(
+                                value,
+                                panel.scorecard.valuePrefix,
+                                panel.scorecard.valueSuffix,
+                              )
+                            : runtime?.state === 'error'
+                              ? 'Unavailable'
+                              : 'Loading'}
+                        </strong>
+                        <p>{panel.scorecard.description}</p>
+                        <p className="runtimeMeta">
+                          {panel.datasetKey} ·{' '}
+                          {runtime?.data?.executionMetadata.connector ?? 'POST /query/execute'}
+                        </p>
+                        <p className="runtimeMeta">
+                          {runtime?.data?.executionMetadata.durationMs != null
+                            ? `${runtime.data.executionMetadata.durationMs} ms`
+                            : 'Awaiting panel result'}
+                        </p>
+                        <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+                        {runtime?.state === 'error' && runtime.errorMessage ? (
+                          <p className="inlineNotice">{runtime.errorMessage}</p>
+                        ) : null}
+                      </article>
+                    );
+                  }
+
+                  if (isTablePanel(panel)) {
+                    return (
+                      <div className="runtimeTableCard" key={runtimePanelKey}>
+                        <div className="runtimeTableHeader">
+                          <span className="kicker">{panel.title}</span>
+                          <span className="queryBadge">
+                            {panel.datasetKey} · top {panel.query.limit ?? 0}
+                          </span>
+                        </div>
+                        <p className="runtimeMeta">{panel.table.description}</p>
+                        <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+
+                        {runtime?.state === 'ready' && runtime.data ? (
+                          (runtime.data.results.length ?? 0) > 0 ? (
+                            <div className="queryTableWrap">
+                              <table className="queryTable">
+                                <thead>
+                                  <tr>
+                                    {panel.table.columns.map((column) => (
+                                      <th key={column} scope="col">
+                                        {column}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {runtime.data.results.map((row, index) => (
+                                    <tr key={`row-${index}`}>
+                                      {panel.table.columns.map((column) => (
+                                        <td key={`${index}-${column}`}>{formatQueryCellValue(row[column])}</td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <p className="callout">The table panel executed successfully, but the dataset returned no rows.</p>
+                          )
+                        ) : runtime?.state === 'error' ? (
+                          <p className="callout calloutError">
+                            {runtime.errorMessage ?? 'The table panel could not be rendered yet.'}
+                          </p>
+                        ) : (
+                          <p className="callout">
+                            Executing the active dashboard table panel against {API_BASE_URL}/query/execute
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <article className="runtimeFallbackCard" key={runtimePanelKey}>
+                      <div className="runtimeTableHeader">
+                        <span className="kicker">{panel.title}</span>
+                        <span className="queryBadge">{panel.kind}</span>
+                      </div>
+                      <p className="runtimeMeta">
+                        This panel is stored on the active dashboard page, but the bootstrap shell does
+                        not render this panel kind yet.
+                      </p>
+                      <p className="runtimeMeta">{panel.datasetKey}</p>
+                      <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+                    </article>
+                  );
+                })}
               </div>
-            ) : null}
+            )}
           </div>
         </section>
 
