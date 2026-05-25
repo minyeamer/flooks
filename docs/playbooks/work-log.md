@@ -889,3 +889,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 00b4373a · Clarify live shell copy
+
+Intent: remove outdated bootstrap-era wording from the live web shell so the runtime homepage no longer looks like an early skeleton slice when opened at the main development URL.
+
+What changed:
+- `apps/api/app/api/routes/overview.py` renamed the overview headline, summary text, route summary, and overview service-link description so the backend now describes the current live shell instead of an initial bootstrap slice.
+- `apps/api/tests/test_system.py` now asserts the new overview headline and summary language to keep the API copy from regressing.
+- `apps/web/src/App.tsx` updated the visible hero and section labels from `Live Bootstrap` wording to `Live Shell`, `Runtime overview`, and `FLooks API reference` so the homepage reads like the current product surface.
+
+Functional result:
+- Opening `http://localhost:5173/` now reads as the current live shell rather than a stale bootstrap landing page.
+- The overview API and the homepage copy describe the same runtime state, which removes a misleading mismatch between backend payload text and frontend capabilities.
+- Operators can recognize the main page as the active dashboard shell before drilling into the runtime and starter-history sections.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
+- `npm run build:web`
