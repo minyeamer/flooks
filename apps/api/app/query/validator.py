@@ -8,6 +8,8 @@ stay out of scope for this phase.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from app.domain.query import DatasetManifest, ExecutionPlanPreview, QueryFilterSpec, QuerySpec, QueryValidationResponse
 from app.query.registry import get_dataset_manifest_registry
 
@@ -21,10 +23,14 @@ class QuerySpecValidationError(ValueError):
         self.message = message
 
 
-def validate_query_spec(query_spec: QuerySpec) -> QueryValidationResponse:
+def validate_query_spec(
+    query_spec: QuerySpec,
+    *,
+    registry: Mapping[str, DatasetManifest] | None = None,
+) -> QueryValidationResponse:
     """Validate a QuerySpec against the in-memory dataset manifest registry."""
 
-    manifest = _get_manifest(query_spec.dataset_key)
+    manifest = _get_manifest(query_spec.dataset_key, registry=registry)
     _validate_dimensions(manifest, query_spec)
     _validate_metrics(manifest, query_spec)
     _validate_filters(manifest, query_spec)
@@ -61,9 +67,13 @@ def validate_query_spec(query_spec: QuerySpec) -> QueryValidationResponse:
     )
 
 
-def _get_manifest(dataset_key: str) -> DatasetManifest:
-    registry = get_dataset_manifest_registry()
-    manifest = registry.get(dataset_key)
+def _get_manifest(
+    dataset_key: str,
+    *,
+    registry: Mapping[str, DatasetManifest] | None = None,
+) -> DatasetManifest:
+    manifest_registry = registry or get_dataset_manifest_registry()
+    manifest = manifest_registry.get(dataset_key)
 
     if manifest is None:
         raise QuerySpecValidationError("datasetKey", f"Unknown dataset '{dataset_key}'.")

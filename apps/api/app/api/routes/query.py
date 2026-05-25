@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
+from app.db.session import get_db_session
 from app.domain.query import (
     QueryBootstrapResponse,
     QueryBootstrapRules,
@@ -11,9 +13,14 @@ from app.domain.query import (
     QuerySpec,
     QueryValidationResponse,
 )
+from app.query.access import (
+    DatasetAccessContext,
+    get_accessible_dataset_manifest_registry,
+    get_dataset_access_context,
+    list_accessible_dataset_manifests,
+)
 from app.query.connector import execute_query_via_connector
-from app.query.exceptions import UnsupportedQueryConnectorError
-from app.query.registry import list_dataset_manifests
+from app.query.exceptions import QueryExecutionError, UnsupportedQueryConnectorError
 from app.query.translator import translate_query_spec
 from app.query.validator import QuerySpecValidationError, validate_query_spec
 
@@ -25,8 +32,11 @@ router = APIRouter(tags=["query"])
     response_model=QueryBootstrapResponse,
     summary="Governed query bootstrap",
 )
-async def get_query_bootstrap() -> QueryBootstrapResponse:
-    datasets = list_dataset_manifests()
+async def get_query_bootstrap(
+    session: Session = Depends(get_db_session),
+    access_context: DatasetAccessContext = Depends(get_dataset_access_context),
+) -> QueryBootstrapResponse:
+    datasets = list_accessible_dataset_manifests(session, access_context)
 
     return QueryBootstrapResponse(
         datasets=datasets,
@@ -43,9 +53,14 @@ async def get_query_bootstrap() -> QueryBootstrapResponse:
     response_model=QueryValidationResponse,
     summary="Validate a QuerySpec payload",
 )
-async def validate_query(query_spec: QuerySpec) -> QueryValidationResponse:
+async def validate_query(
+    query_spec: QuerySpec,
+    session: Session = Depends(get_db_session),
+    access_context: DatasetAccessContext = Depends(get_dataset_access_context),
+) -> QueryValidationResponse:
     try:
-        return validate_query_spec(query_spec)
+        registry = get_accessible_dataset_manifest_registry(session, access_context)
+        return validate_query_spec(query_spec, registry=registry)
     except QuerySpecValidationError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -58,9 +73,14 @@ async def validate_query(query_spec: QuerySpec) -> QueryValidationResponse:
     response_model=QueryExecutionResponse,
     summary="Execute a QuerySpec request",
 )
-async def execute_query(query_spec: QuerySpec) -> QueryExecutionResponse:
+async def execute_query(
+    query_spec: QuerySpec,
+    session: Session = Depends(get_db_session),
+    access_context: DatasetAccessContext = Depends(get_dataset_access_context),
+) -> QueryExecutionResponse:
     try:
-        validation = validate_query_spec(query_spec)
+        registry = get_accessible_dataset_manifest_registry(session, access_context)
+        validation = validate_query_spec(query_spec, registry=registry)
     except QuerySpecValidationError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -70,6 +90,14 @@ async def execute_query(query_spec: QuerySpec) -> QueryExecutionResponse:
     try:
         sql, params = translate_query_spec(validation.manifest, validation.normalized_spec)
         return execute_query_via_connector(validation.manifest, sql, params)
+    except QueryExecutionError as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail={
+                "field": error.field,
+                "message": str(error),
+            },
+        ) from error
     except UnsupportedQueryConnectorError as error:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,

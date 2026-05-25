@@ -41,9 +41,10 @@ def test_overview() -> None:
     assert "starter dashboard operations" in payload["summary"]
     assert any(metric["label"] == "Metadata tables" and metric["value"] == "4" for metric in payload["metrics"])
     assert any(metric["label"] == "Governed datasets" and metric["value"] == "2" for metric in payload["metrics"])
-    assert any(metric["label"] == "Live endpoints" and metric["value"] == "16" for metric in payload["metrics"])
+    assert any(metric["label"] == "Live endpoints" and metric["value"] == "19" for metric in payload["metrics"])
     assert any(link["href"] == "/api/v1/overview" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/identity/bootstrap" for link in payload["service_links"])
+    assert any(link["href"] == "/api/v1/identity/dataset-grants" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/metadata/bootstrap" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/dashboards" for link in payload["service_links"])
     assert any(link["href"] == "/api/v1/dashboards/commerce-home/refresh-starter" for link in payload["service_links"])
@@ -60,18 +61,52 @@ def test_api_reference() -> None:
 
     assert payload["title"] == "FLooks Bootstrap API Reference"
     assert any(viewer["href"] == "/docs" for viewer in payload["viewers"])
+    assert any(endpoint["path"] == "/api/v1/identity/dataset-grants" for endpoint in payload["endpoints"])
     assert any(endpoint["path"] == "/api/v1/dashboards" for endpoint in payload["endpoints"])
     assert any(endpoint["path"] == "/api/v1/dashboards/{slug}/refresh-starter" for endpoint in payload["endpoints"])
     assert any(endpoint["path"] == "/api/v1/query/validate" for endpoint in payload["endpoints"])
 
+    dataset_grants_list = next(
+        endpoint for endpoint in payload["endpoints"] if endpoint["id"] == "identity-dataset-grants-list"
+    )
+    dataset_grants_upsert = next(
+        endpoint for endpoint in payload["endpoints"] if endpoint["id"] == "identity-dataset-grants-upsert"
+    )
+    dashboards_update = next(
+        endpoint for endpoint in payload["endpoints"] if endpoint["id"] == "dashboards-update"
+    )
+    query_bootstrap = next(endpoint for endpoint in payload["endpoints"] if endpoint["id"] == "query-bootstrap")
     query_validate = next(endpoint for endpoint in payload["endpoints"] if endpoint["id"] == "query-validate")
+    query_execute = next(endpoint for endpoint in payload["endpoints"] if endpoint["id"] == "query-execute")
     dashboards_refresh = next(
         endpoint for endpoint in payload["endpoints"] if endpoint["id"] == "dashboards-refresh-starter"
     )
 
+    assert dataset_grants_list["method"] == "GET"
+    assert any(
+        field["name"] == "catalog_datasets[].key"
+        for response_item in dataset_grants_list["responses"]
+        for field in response_item["fields"]
+    )
+    assert any(
+        field["name"] == "catalog_datasets[].usage_summary.dashboard_count"
+        for response_item in dataset_grants_list["responses"]
+        for field in response_item["fields"]
+    )
+    assert dataset_grants_upsert["method"] == "PUT"
+    assert any(parameter["name"] == "dataset_key" for parameter in dataset_grants_upsert["parameters"])
+    assert any(response_item["status_code"] == 201 for response_item in dataset_grants_upsert["responses"])
+    assert dashboards_update["method"] == "PUT"
+    assert any(
+        response_item["status_code"] == 400 and "placement" in response_item["description"]
+        for response_item in dashboards_update["responses"]
+    )
+    assert any(parameter["name"] == "X-FLooks-Workspace" for parameter in query_bootstrap["parameters"])
     assert query_validate["method"] == "POST"
+    assert any(parameter["name"] == "X-FLooks-Teams" for parameter in query_validate["parameters"])
     assert any(parameter["name"] == "limit" for parameter in query_validate["parameters"])
     assert any(response_item["status_code"] == 400 for response_item in query_validate["responses"])
+    assert any(parameter["name"] == "X-FLooks-Workspace" for parameter in query_execute["parameters"])
     assert dashboards_refresh["method"] == "POST"
     assert dashboards_refresh["path"] == "/api/v1/dashboards/{slug}/refresh-starter"
 
@@ -124,3 +159,12 @@ def test_settings_accept_database_url() -> None:
     settings = Settings(_env_file=None, database_url=" postgresql+psycopg://flooks:flooks@localhost:5432/flooks_meta ")
 
     assert settings.database_url == "postgresql+psycopg://flooks:flooks@localhost:5432/flooks_meta"
+
+
+def test_settings_accept_analytics_database_url() -> None:
+    settings = Settings(
+        _env_file=None,
+        analytics_database_url=" postgresql+psycopg://flooks:flooks@localhost:5432/flooks_analytics ",
+    )
+
+    assert settings.analytics_database_url == "postgresql+psycopg://flooks:flooks@localhost:5432/flooks_analytics"

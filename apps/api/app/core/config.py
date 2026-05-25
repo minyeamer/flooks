@@ -13,9 +13,10 @@ class Settings(BaseSettings):
     """Runtime configuration for the FLooks API service.
 
     The service currently supports local development defaults and Docker Compose
-    overrides. Metadata persistence uses `database_url`, which can point to the
-    local host during direct execution or to the `postgres` service inside the
-    container network.
+    overrides. Metadata persistence uses `database_url`, while governed query
+    execution can optionally use a separate `analytics_database_url`. Both can
+    point to the local host during direct execution or to Compose services
+    inside the container network.
     """
 
     app_name: str = "FLooks API"
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     allowed_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
     database_url: str = "postgresql+psycopg://flooks:flooks@localhost:5432/flooks_meta"
+    analytics_database_url: str | None = None
+    bootstrap_dev_analytics: bool = False
 
     model_config = SettingsConfigDict(
         env_prefix="FLOOKS_",
@@ -37,9 +40,12 @@ class Settings(BaseSettings):
             raise ValueError("api_v1_prefix must start with '/'")
         return value.rstrip("/") or "/"
 
-    @field_validator("database_url")
+    @field_validator("database_url", "analytics_database_url")
     @classmethod
-    def validate_database_url(cls, value: str) -> str:
+    def validate_database_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
         normalized_value = value.strip()
         if not normalized_value:
             raise ValueError("database_url must not be empty")

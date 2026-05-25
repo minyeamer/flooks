@@ -26,6 +26,7 @@ services:
       FLOOKS_API_V1_PREFIX: /api/v1
       FLOOKS_ALLOWED_ORIGINS: http://localhost:${FLOOKS_WEB_PORT:-5173}
       FLOOKS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-flooks}:${POSTGRES_PASSWORD:-flooks}@postgres:5432/${POSTGRES_DB:-flooks_meta}
+      FLOOKS_BOOTSTRAP_DEV_ANALYTICS: "true"
     ports:
       - "${FLOOKS_API_PORT:-8000}:8000"
     depends_on:

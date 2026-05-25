@@ -1,4 +1,12 @@
-import { useEffect, useState, type CSSProperties, type KeyboardEvent, type WheelEvent } from 'react';
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent,
+} from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import {
   dataSourceKinds,
@@ -94,6 +102,62 @@ type ApiReferenceResponse = {
   endpoints: ApiEndpointReference[];
 };
 
+type DatasetGrantAxis = 'user' | 'team' | 'department' | 'role' | 'workspace';
+
+type DatasetUsagePanelEntry = {
+  dashboard_slug: string;
+  dashboard_title: string;
+  panel_id: string;
+  panel_title: string;
+  panel_kind: string;
+};
+
+type DatasetUsageSummary = {
+  dashboard_count: number;
+  panel_count: number;
+  sample_panels: DatasetUsagePanelEntry[];
+};
+
+type DatasetGrantCatalogEntry = {
+  key: string;
+  label: string;
+  description: string;
+  grant_axes: DatasetGrantAxis[];
+  usage_summary: DatasetUsageSummary;
+};
+
+type DatasetGrantEntry = {
+  id: string;
+  dataset_key: string;
+  grant_axis: DatasetGrantAxis;
+  subject_key: string;
+  granted_by: string | null;
+  created_at: string;
+};
+
+type DatasetGrantListResponse = {
+  catalog_datasets: DatasetGrantCatalogEntry[];
+  grants: DatasetGrantEntry[];
+};
+
+type QueryBootstrapDataset = {
+  key: string;
+  label: string;
+  description: string;
+  visibility: {
+    grantAxes: DatasetGrantAxis[];
+  };
+};
+
+type QueryBootstrapResponse = {
+  datasets: QueryBootstrapDataset[];
+  rules: {
+    rawSqlAllowed: boolean;
+    datasetManifestRequired: boolean;
+    executionPreviewOnly: boolean;
+  };
+};
+
 type DashboardApiResponse = {
   slug: string;
   title: string;
@@ -101,6 +165,7 @@ type DashboardApiResponse = {
   ownerPrincipalKind: DashboardOwnerPrincipalKind;
   latestVersionNumber: number;
   latestVersionStatus: 'draft' | 'published' | 'archived';
+  latestVersionSummary: string | null;
   publishedVersionCount: number;
   latestPublishedVersionNumber: number | null;
   archivedVersionCount: number;
@@ -120,6 +185,7 @@ type DashboardSummaryResponse = {
   ownerPrincipalKey: string;
   latestVersionNumber: number;
   latestVersionStatus: 'draft' | 'published' | 'archived';
+  latestVersionSummary: string | null;
   publishedVersionCount: number;
   latestPublishedVersionNumber: number | null;
   archivedVersionCount: number;
@@ -159,6 +225,33 @@ type PanelRuntimeEntry = {
   state: RequestState;
   data: QueryExecutionResponse | null;
   errorMessage: string | null;
+};
+
+type ShellSurface =
+  | 'home'
+  | 'dashboards'
+  | 'dashboard-runtime'
+  | 'dashboard-editor'
+  | 'grants'
+  | 'reference';
+
+type ShellRouteMatch = {
+  surface: ShellSurface;
+  dashboardSlug: string | null;
+  isKnown: boolean;
+};
+
+type LayoutEditorDragState = {
+  mode: 'move' | 'resize';
+  panelId: string;
+  pageId: string;
+  pointerId: number;
+  originClientX: number;
+  originClientY: number;
+  originX: number;
+  originY: number;
+  originWidth: number;
+  originHeight: number;
 };
 
 type RuntimePanelEntry = {
@@ -251,6 +344,7 @@ const runtimeCanvasZoomPercentMin = 85;
 const runtimeCanvasZoomPercentMax = 170;
 const clearStarterHistoryConfirmTimeoutMs = 4000;
 const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f'] as const;
+const datasetGrantAxes: DatasetGrantAxis[] = ['user', 'team', 'department', 'role', 'workspace'];
 const dashboardOwnerPrincipalKinds: DashboardOwnerPrincipalKind[] = [
   'user',
   'team',
@@ -733,6 +827,28 @@ function formatPlacementLabel(placement: PanelPlacement): string {
   return `Placement ${placement.x},${placement.y} · ${placement.width}×${placement.height}`;
 }
 
+function formatCountDeltaLabel(label: string, currentCount: number, latestCount: number): string {
+  const delta = latestCount - currentCount;
+
+  if (delta === 0) {
+    return `${label} unchanged`;
+  }
+
+  return `${label} ${delta > 0 ? '+' : ''}${delta}`;
+}
+
+function formatTitleList(titles: string[]): string {
+  if (titles.length === 0) {
+    return '';
+  }
+
+  if (titles.length === 1) {
+    return titles[0];
+  }
+
+  return `${titles.slice(0, -1).join(', ')} and ${titles[titles.length - 1]}`;
+}
+
 function getRuntimeChartData(
   panel: PanelRef,
   runtime: PanelRuntimeEntry | undefined,
@@ -1030,7 +1146,102 @@ async function getResponseMessage(response: Response, fallback: string): Promise
   return fallback;
 }
 
+function normalizeShellPath(pathname: string): string {
+  if (pathname.length > 1 && pathname.endsWith('/')) {
+    return pathname.slice(0, -1);
+  }
+
+  return pathname;
+}
+
+function decodeShellPathSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function buildDashboardRuntimePath(slug: string): string {
+  return `/dashboards/${encodeURIComponent(slug)}`;
+}
+
+function buildDashboardEditorPath(slug: string): string {
+  return `${buildDashboardRuntimePath(slug)}/edit`;
+}
+
+function getShellRouteMatch(pathname: string): ShellRouteMatch {
+  const normalizedPathname = normalizeShellPath(pathname);
+
+  if (normalizedPathname === '/') {
+    return {
+      surface: 'home',
+      dashboardSlug: null,
+      isKnown: true,
+    };
+  }
+
+  if (normalizedPathname === '/dashboards') {
+    return {
+      surface: 'dashboards',
+      dashboardSlug: null,
+      isKnown: true,
+    };
+  }
+
+  const dashboardEditorMatch = normalizedPathname.match(/^\/dashboards\/([^/]+)\/edit$/);
+
+  if (dashboardEditorMatch) {
+    return {
+      surface: 'dashboard-editor',
+      dashboardSlug: decodeShellPathSegment(dashboardEditorMatch[1]),
+      isKnown: true,
+    };
+  }
+
+  const dashboardRuntimeMatch = normalizedPathname.match(/^\/dashboards\/([^/]+)$/);
+
+  if (dashboardRuntimeMatch) {
+    return {
+      surface: 'dashboard-runtime',
+      dashboardSlug: decodeShellPathSegment(dashboardRuntimeMatch[1]),
+      isKnown: true,
+    };
+  }
+
+  if (normalizedPathname === '/grants') {
+    return {
+      surface: 'grants',
+      dashboardSlug: null,
+      isKnown: true,
+    };
+  }
+
+  if (normalizedPathname === '/reference') {
+    return {
+      surface: 'reference',
+      dashboardSlug: null,
+      isKnown: true,
+    };
+  }
+
+  return {
+    surface: 'home',
+    dashboardSlug: null,
+    isKnown: false,
+  };
+}
+
+function getSnappedPlacementCoordinate(value: number, gridSize: number, maxCoordinate: number): number {
+  return clampGridValue(Math.round(value / gridSize) * gridSize, 0, Math.max(0, maxCoordinate));
+}
+
 function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const shellRouteMatch = getShellRouteMatch(location.pathname);
+  const currentShellSurface = shellRouteMatch.surface;
+  const routeDashboardSlug = shellRouteMatch.dashboardSlug;
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [apiReference, setApiReference] = useState<ApiReferenceResponse | null>(null);
@@ -1043,6 +1254,10 @@ function App() {
   const [dashboardDirectoryState, setDashboardDirectoryState] = useState<RequestState>('loading');
   const [dashboardDirectoryErrorMessage, setDashboardDirectoryErrorMessage] = useState<string | null>(null);
   const [dashboardDocument, setDashboardDocument] = useState<DashboardDocument>(starterDashboard);
+  const [latestDashboardDocument, setLatestDashboardDocument] = useState<DashboardDocument | null>(null);
+  const [layoutEditorDocument, setLayoutEditorDocument] = useState<DashboardDocument | null>(null);
+  const [layoutEditorDragState, setLayoutEditorDragState] = useState<LayoutEditorDragState | null>(null);
+  const [isLayoutEditorDirty, setIsLayoutEditorDirty] = useState<boolean>(false);
   const [activePageId, setActivePageId] = useState<string | null>(() =>
     getDefaultDashboardPageId(starterDashboard),
   );
@@ -1078,6 +1293,31 @@ function App() {
   const [dashboardVersionDraftStatus, setDashboardVersionDraftStatus] =
     useState<DashboardVersionStatus>('draft');
   const [isSavingDashboardVersion, setIsSavingDashboardVersion] = useState<boolean>(false);
+  const [datasetGrantCatalog, setDatasetGrantCatalog] = useState<DatasetGrantCatalogEntry[]>([]);
+  const [datasetGrants, setDatasetGrants] = useState<DatasetGrantEntry[]>([]);
+  const [datasetGrantState, setDatasetGrantState] = useState<RequestState>('loading');
+  const [datasetGrantErrorMessage, setDatasetGrantErrorMessage] = useState<string | null>(null);
+  const [datasetGrantNotice, setDatasetGrantNotice] = useState<string | null>(null);
+  const [datasetGrantNoticeTone, setDatasetGrantNoticeTone] = useState<'default' | 'error' | 'success'>('default');
+  const [datasetGrantDraftDatasetKey, setDatasetGrantDraftDatasetKey] = useState<string>(
+    starterDashboard.panelLibrary[0]?.datasetKey ?? '',
+  );
+  const [datasetGrantDraftAxis, setDatasetGrantDraftAxis] = useState<DatasetGrantAxis>('workspace');
+  const [datasetGrantDraftSubjectKey, setDatasetGrantDraftSubjectKey] = useState<string>('primary');
+  const [datasetGrantDraftGrantedBy, setDatasetGrantDraftGrantedBy] = useState<string>('web-shell');
+  const [isSavingDatasetGrant, setIsSavingDatasetGrant] = useState<boolean>(false);
+  const [deletingDatasetGrantId, setDeletingDatasetGrantId] = useState<string | null>(null);
+  const [datasetAccessPreviewUserKey, setDatasetAccessPreviewUserKey] = useState<string>('');
+  const [datasetAccessPreviewTeamKeys, setDatasetAccessPreviewTeamKeys] = useState<string>('');
+  const [datasetAccessPreviewDepartmentKey, setDatasetAccessPreviewDepartmentKey] = useState<string>('');
+  const [datasetAccessPreviewRoleKey, setDatasetAccessPreviewRoleKey] = useState<string>('');
+  const [datasetAccessPreviewWorkspaceKey, setDatasetAccessPreviewWorkspaceKey] = useState<string>('primary');
+  const [appliedDatasetAccessHeaders, setAppliedDatasetAccessHeaders] = useState<Record<string, string> | null>(
+    null,
+  );
+  const [accessibleDatasets, setAccessibleDatasets] = useState<QueryBootstrapDataset[]>([]);
+  const [datasetAccessPreviewState, setDatasetAccessPreviewState] = useState<RequestState>('loading');
+  const [datasetAccessPreviewErrorMessage, setDatasetAccessPreviewErrorMessage] = useState<string | null>(null);
   const [starterRefreshOutcome, setStarterRefreshOutcome] = useState<StarterRefreshOutcome>(null);
   const [starterRefreshHistory, setStarterRefreshHistory] = useState<StarterRefreshHistoryEntry[]>(() =>
     loadStarterRefreshHistory(),
@@ -1106,6 +1346,9 @@ function App() {
       payload.versions.find((version) => version.versionNumber === payload.document.version) ?? null;
 
     setDashboardDocument(payload.document);
+    if (isViewingLatestDashboardVersion) {
+      setLatestDashboardDocument(payload.document);
+    }
     setDashboardVersions(payload.versions);
     setSelectedDashboardSlug(payload.slug);
     setDashboardSourceLabel(
@@ -1138,6 +1381,7 @@ function App() {
 
   function applyStarterSeedFallback(notice: string, tone: 'default' | 'error'): void {
     setDashboardDocument(starterDashboard);
+    setLatestDashboardDocument(null);
     setDashboardVersions([]);
     setDashboardSourceLabel('Starter seed');
     setPersistedDashboardVersion(null);
@@ -1256,6 +1500,213 @@ function App() {
     }
   }
 
+  function buildDatasetAccessHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    const userKey = datasetAccessPreviewUserKey.trim();
+    const teamKeys = datasetAccessPreviewTeamKeys.trim();
+    const departmentKey = datasetAccessPreviewDepartmentKey.trim();
+    const roleKey = datasetAccessPreviewRoleKey.trim();
+    const workspaceKey = datasetAccessPreviewWorkspaceKey.trim();
+
+    if (userKey.length > 0) {
+      headers['X-FLooks-User'] = userKey;
+    }
+
+    if (teamKeys.length > 0) {
+      headers['X-FLooks-Teams'] = teamKeys;
+    }
+
+    if (departmentKey.length > 0) {
+      headers['X-FLooks-Department'] = departmentKey;
+    }
+
+    if (roleKey.length > 0) {
+      headers['X-FLooks-Role'] = roleKey;
+    }
+
+    if (workspaceKey.length > 0) {
+      headers['X-FLooks-Workspace'] = workspaceKey;
+    }
+
+    return headers;
+  }
+
+  async function loadDatasetGrantControlState(signal?: AbortSignal): Promise<void> {
+    try {
+      setDatasetGrantState('loading');
+      setDatasetGrantErrorMessage(null);
+
+      const response = await fetch(`${API_BASE_URL}/identity/dataset-grants`, { signal });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(response, 'Unable to load dataset grants from the metadata store.'),
+        );
+      }
+
+      const payload = (await response.json()) as DatasetGrantListResponse;
+
+      if (signal?.aborted) {
+        return;
+      }
+
+      setDatasetGrantCatalog(payload.catalog_datasets);
+      setDatasetGrants(payload.grants);
+      setDatasetGrantDraftDatasetKey((currentValue) =>
+        payload.catalog_datasets.some((dataset) => dataset.key === currentValue)
+          ? currentValue
+          : payload.catalog_datasets[0]?.key ?? '',
+      );
+      setDatasetGrantState('ready');
+    } catch (error) {
+      if (signal?.aborted) {
+        return;
+      }
+
+      setDatasetGrantState('error');
+      setDatasetGrantErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to load dataset grants from the metadata store.',
+      );
+    }
+  }
+
+  async function loadAccessibleDatasetPreview(signal?: AbortSignal): Promise<void> {
+    try {
+      setDatasetAccessPreviewState('loading');
+      setDatasetAccessPreviewErrorMessage(null);
+      const nextHeaders = buildDatasetAccessHeaders();
+
+      const response = await fetch(`${API_BASE_URL}/query/bootstrap`, {
+        signal,
+        headers: nextHeaders,
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(response, 'Unable to preview dataset visibility for this access context.'),
+        );
+      }
+
+      const payload = (await response.json()) as QueryBootstrapResponse;
+
+      if (signal?.aborted) {
+        return;
+      }
+
+      setAccessibleDatasets(payload.datasets);
+      setAppliedDatasetAccessHeaders(nextHeaders);
+      setDatasetAccessPreviewState('ready');
+    } catch (error) {
+      if (signal?.aborted) {
+        return;
+      }
+
+      setDatasetAccessPreviewState('error');
+      setDatasetAccessPreviewErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to preview dataset visibility for this access context.',
+      );
+    }
+  }
+
+  async function handleCreateDatasetGrant(): Promise<void> {
+    const datasetKey = datasetGrantDraftDatasetKey.trim();
+    const subjectKey = datasetGrantDraftSubjectKey.trim();
+    const grantedBy = datasetGrantDraftGrantedBy.trim();
+
+    if (datasetKey.length === 0 || subjectKey.length === 0) {
+      setDatasetGrantNotice('Dataset key and subject key are required to create a dataset grant.');
+      setDatasetGrantNoticeTone('error');
+      return;
+    }
+
+    try {
+      setIsSavingDatasetGrant(true);
+      setDatasetGrantNotice(null);
+      setDatasetGrantNoticeTone('default');
+
+      const response = await fetch(`${API_BASE_URL}/identity/dataset-grants`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dataset_key: datasetKey,
+          grant_axis: datasetGrantDraftAxis,
+          subject_key: subjectKey,
+          granted_by: grantedBy.length > 0 ? grantedBy : null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(response, `Unable to create a dataset grant for '${datasetKey}'.`),
+        );
+      }
+
+      const payload = (await response.json()) as DatasetGrantEntry;
+      const requestWasCreated = response.status === 201;
+
+      setDatasetGrantNotice(
+        requestWasCreated
+          ? `Granted ${payload.grant_axis} '${payload.subject_key}' access to dataset '${payload.dataset_key}'.`
+          : `Dataset grant '${payload.dataset_key} / ${payload.grant_axis} / ${payload.subject_key}' already exists.`,
+      );
+      setDatasetGrantNoticeTone('success');
+
+      await Promise.all([loadDatasetGrantControlState(), loadAccessibleDatasetPreview()]);
+    } catch (error) {
+      setDatasetGrantNotice(
+        error instanceof Error
+          ? error.message
+          : `Unable to create a dataset grant for '${datasetKey}'.`,
+      );
+      setDatasetGrantNoticeTone('error');
+    } finally {
+      setIsSavingDatasetGrant(false);
+    }
+  }
+
+  async function handleDeleteDatasetGrant(grant: DatasetGrantEntry): Promise<void> {
+    try {
+      setDeletingDatasetGrantId(grant.id);
+      setDatasetGrantNotice(null);
+      setDatasetGrantNoticeTone('default');
+
+      const response = await fetch(`${API_BASE_URL}/identity/dataset-grants/${grant.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(
+            response,
+            `Unable to delete dataset grant '${grant.dataset_key} / ${grant.grant_axis} / ${grant.subject_key}'.`,
+          ),
+        );
+      }
+
+      setDatasetGrantNotice(
+        `Removed ${grant.grant_axis} '${grant.subject_key}' from dataset '${grant.dataset_key}'.`,
+      );
+      setDatasetGrantNoticeTone('success');
+
+      await Promise.all([loadDatasetGrantControlState(), loadAccessibleDatasetPreview()]);
+    } catch (error) {
+      setDatasetGrantNotice(
+        error instanceof Error
+          ? error.message
+          : `Unable to delete dataset grant '${grant.dataset_key} / ${grant.grant_axis} / ${grant.subject_key}'.`,
+      );
+      setDatasetGrantNoticeTone('error');
+    } finally {
+      setDeletingDatasetGrantId(null);
+    }
+  }
+
   async function loadDashboardDocument(
     slug: string,
     versionNumber: number | null,
@@ -1310,6 +1761,10 @@ function App() {
       }
 
       applyDashboardPayload(payload);
+
+      if (versionNumber != null && payload.document.version !== payload.latestVersionNumber) {
+        void loadLatestDashboardDocumentSnapshot(slug, signal);
+      }
     } catch (error) {
       if (signal?.aborted) {
         return;
@@ -1332,6 +1787,29 @@ function App() {
     }
   }
 
+  async function loadLatestDashboardDocumentSnapshot(
+    slug: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboards/${slug}`, { signal });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as DashboardApiResponse;
+
+      if (signal?.aborted) {
+        return;
+      }
+
+      setLatestDashboardDocument(payload.document);
+    } catch {
+      return;
+    }
+  }
+
   async function handleCreateDashboardVersion(): Promise<void> {
     await persistDashboardVersion();
   }
@@ -1340,10 +1818,11 @@ function App() {
     options: {
       status?: DashboardVersionStatus;
       summary?: string | null;
+      document?: DashboardDocument;
     } = {},
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (selectedDashboardSummary == null) {
-      return;
+      return false;
     }
 
     const createdBy = dashboardVersionDraftCreatedBy.trim();
@@ -1352,11 +1831,12 @@ function App() {
     const summary =
       summaryInput == null ? null : summaryInput.trim().length > 0 ? summaryInput.trim() : null;
     const nextDescription = dashboardVersionDraftDescription.trim();
+    const nextDocument = options.document ?? dashboardDocument;
 
     if (createdBy.length === 0) {
       setDashboardNotice('Created by is required to persist a new dashboard revision.');
       setDashboardNoticeTone('error');
-      return;
+      return false;
     }
 
     try {
@@ -1374,7 +1854,7 @@ function App() {
           summary,
           status: nextStatus,
           description: nextDescription.length > 0 ? nextDescription : null,
-          document: dashboardDocument,
+          document: nextDocument,
         }),
       });
 
@@ -1400,6 +1880,7 @@ function App() {
       );
       setDashboardNoticeTone('success');
       void loadDashboardDirectory();
+      return true;
     } catch (error) {
       setDashboardNotice(
         error instanceof Error
@@ -1407,8 +1888,197 @@ function App() {
           : `Unable to create a new version for dashboard '${selectedDashboardSummary.slug}'.`,
       );
       setDashboardNoticeTone('error');
+      return false;
     } finally {
       setIsSavingDashboardVersion(false);
+    }
+  }
+
+  function updateLayoutEditorPlacement(
+    page: DashboardPage,
+    placement: PanelPlacement,
+    updates: Partial<Pick<PanelPlacement, 'x' | 'y' | 'width' | 'height'>>,
+  ): void {
+    if (layoutEditorDocument == null) {
+      return;
+    }
+
+    const nextX = updates.x ?? placement.x;
+    const nextY = updates.y ?? placement.y;
+    const nextWidth = updates.width ?? placement.width;
+    const nextHeight = updates.height ?? placement.height;
+
+    if (
+      placement.x === nextX &&
+      placement.y === nextY &&
+      placement.width === nextWidth &&
+      placement.height === nextHeight
+    ) {
+      return;
+    }
+
+    setLayoutEditorDocument({
+      ...layoutEditorDocument,
+      pages: layoutEditorDocument.pages.map((currentPage) =>
+        currentPage.id !== page.id
+          ? currentPage
+          : {
+              ...currentPage,
+              placements: currentPage.placements.map((currentPlacement) =>
+                currentPlacement.panelId !== placement.panelId
+                  ? currentPlacement
+                  : {
+                      ...currentPlacement,
+                      x: nextX,
+                      y: nextY,
+                      width: nextWidth,
+                      height: nextHeight,
+                    },
+              ),
+            },
+      ),
+    });
+    setIsLayoutEditorDirty(true);
+  }
+
+  function handleLayoutEditorPointerDown(
+    event: ReactPointerEvent<HTMLElement>,
+    page: DashboardPage,
+    placement: PanelPlacement,
+  ): void {
+    if (currentShellSurface !== 'dashboard-editor') {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setLayoutEditorDragState({
+      mode: 'move',
+      panelId: placement.panelId,
+      pageId: page.id,
+      pointerId: event.pointerId,
+      originClientX: event.clientX,
+      originClientY: event.clientY,
+      originX: placement.x,
+      originY: placement.y,
+      originWidth: placement.width,
+      originHeight: placement.height,
+    });
+  }
+
+  function handleLayoutEditorResizePointerDown(
+    event: ReactPointerEvent<HTMLElement>,
+    page: DashboardPage,
+    placement: PanelPlacement,
+  ): void {
+    if (currentShellSurface !== 'dashboard-editor') {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setLayoutEditorDragState({
+      mode: 'resize',
+      panelId: placement.panelId,
+      pageId: page.id,
+      pointerId: event.pointerId,
+      originClientX: event.clientX,
+      originClientY: event.clientY,
+      originX: placement.x,
+      originY: placement.y,
+      originWidth: placement.width,
+      originHeight: placement.height,
+    });
+  }
+
+  function handleLayoutEditorPointerMove(
+    event: ReactPointerEvent<HTMLElement>,
+    page: DashboardPage,
+    placement: PanelPlacement,
+  ): void {
+    if (
+      currentShellSurface !== 'dashboard-editor' ||
+      layoutEditorDragState == null ||
+      layoutEditorDragState.panelId !== placement.panelId ||
+      layoutEditorDragState.pageId !== page.id ||
+      layoutEditorDragState.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    const deltaX = (event.clientX - layoutEditorDragState.originClientX) / runtimeCanvasScaleFactor;
+    const deltaY = (event.clientY - layoutEditorDragState.originClientY) / runtimeCanvasScaleFactor;
+
+    if (layoutEditorDragState.mode === 'resize') {
+      const nextWidth = getSnappedPlacementCoordinate(
+        layoutEditorDragState.originWidth + deltaX,
+        page.snapGrid.columnWidth,
+        page.width - layoutEditorDragState.originX,
+      );
+      const nextHeight = getSnappedPlacementCoordinate(
+        layoutEditorDragState.originHeight + deltaY,
+        page.snapGrid.rowHeight,
+        page.height - layoutEditorDragState.originY,
+      );
+
+      updateLayoutEditorPlacement(page, placement, {
+        width: Math.max(page.snapGrid.columnWidth, nextWidth),
+        height: Math.max(page.snapGrid.rowHeight, nextHeight),
+      });
+      return;
+    }
+
+    const nextX = getSnappedPlacementCoordinate(
+      layoutEditorDragState.originX + deltaX,
+      page.snapGrid.columnWidth,
+      page.width - layoutEditorDragState.originWidth,
+    );
+    const nextY = getSnappedPlacementCoordinate(
+      layoutEditorDragState.originY + deltaY,
+      page.snapGrid.rowHeight,
+      page.height - layoutEditorDragState.originHeight,
+    );
+
+    updateLayoutEditorPlacement(page, placement, { x: nextX, y: nextY });
+  }
+
+  function handleLayoutEditorPointerEnd(event: ReactPointerEvent<HTMLElement>): void {
+    if (layoutEditorDragState == null || layoutEditorDragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    setLayoutEditorDragState(null);
+  }
+
+  function handleResetLayoutEditor(): void {
+    setLayoutEditorDocument(structuredClone(dashboardDocument));
+    setLayoutEditorDragState(null);
+    setIsLayoutEditorDirty(false);
+    setDashboardNotice('Reset unsaved layout changes back to the loaded dashboard version.');
+    setDashboardNoticeTone('default');
+  }
+
+  async function handleSaveLayoutEditor(): Promise<void> {
+    if (layoutEditorDocument == null) {
+      return;
+    }
+
+    const wasSaved = await persistDashboardVersion({
+      document: layoutEditorDocument,
+      summary:
+        dashboardVersionDraftSummary.trim().length > 0
+          ? dashboardVersionDraftSummary
+          : 'Layout updated in the web shell editor.',
+    });
+
+    if (wasSaved) {
+      setLayoutEditorDragState(null);
+      setIsLayoutEditorDirty(false);
     }
   }
 
@@ -1740,6 +2410,54 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
 
+    void loadDatasetGrantControlState(controller.signal);
+    void loadAccessibleDatasetPreview(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (shellRouteMatch.isKnown) {
+      return;
+    }
+
+    navigate('/', { replace: true });
+  }, [navigate, shellRouteMatch.isKnown]);
+
+  useEffect(() => {
+    if (routeDashboardSlug == null || routeDashboardSlug === selectedDashboardSlug) {
+      return;
+    }
+
+    setSelectedDashboardSlug(routeDashboardSlug);
+  }, [routeDashboardSlug, selectedDashboardSlug]);
+
+  useEffect(() => {
+    if (currentShellSurface !== 'dashboard-runtime' && currentShellSurface !== 'dashboard-editor') {
+      return;
+    }
+
+    if (routeDashboardSlug != null && routeDashboardSlug !== selectedDashboardSlug) {
+      return;
+    }
+
+    const expectedPath =
+      currentShellSurface === 'dashboard-editor'
+        ? buildDashboardEditorPath(selectedDashboardSlug)
+        : buildDashboardRuntimePath(selectedDashboardSlug);
+
+    if (normalizeShellPath(location.pathname) === expectedPath) {
+      return;
+    }
+
+    navigate(expectedPath, { replace: true });
+  }, [currentShellSurface, location.pathname, navigate, routeDashboardSlug, selectedDashboardSlug]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
     void loadDashboardDocument(selectedDashboardSlug, selectedDashboardVersionNumber, controller.signal);
 
     return () => {
@@ -1750,6 +2468,17 @@ function App() {
   useEffect(() => {
     setSelectedDashboardVersionNumber(null);
   }, [selectedDashboardSlug]);
+
+  useEffect(() => {
+    if (currentShellSurface !== 'dashboard-editor') {
+      setLayoutEditorDragState(null);
+      return;
+    }
+
+    setLayoutEditorDocument(structuredClone(dashboardDocument));
+    setLayoutEditorDragState(null);
+    setIsLayoutEditorDirty(false);
+  }, [currentShellSurface, dashboardDocument]);
 
   useEffect(() => {
     persistStarterRefreshHistory(starterRefreshHistory);
@@ -1847,6 +2576,10 @@ function App() {
 
       setPanelRuntime(buildInitialPanelRuntime(dashboardDocument, activePageId));
 
+      if (appliedDatasetAccessHeaders == null) {
+        return;
+      }
+
       for (const { panel } of runtimePanelEntries) {
         if (panel.query == null) {
           continue;
@@ -1857,6 +2590,7 @@ function App() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...appliedDatasetAccessHeaders,
             },
             body: JSON.stringify(panel.query),
             signal: controller.signal,
@@ -1910,13 +2644,20 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [activePageId, dashboardDocument]);
+  }, [activePageId, appliedDatasetAccessHeaders, dashboardDocument]);
 
   const liveRoles = system?.roles ?? systemRoles;
   const liveDataSources = system?.dataSources ?? dataSourceKinds;
   const liveModules = system?.modules ?? [];
-  const activeDashboardPage = getActiveDashboardPage(dashboardDocument, activePageId);
-  const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
+  const canvasDashboardDocument =
+    currentShellSurface === 'dashboard-editor' && layoutEditorDocument != null
+      ? layoutEditorDocument
+      : dashboardDocument;
+  const activeDashboardPage = getActiveDashboardPage(canvasDashboardDocument, activePageId);
+  const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(
+    canvasDashboardDocument,
+    activePageId,
+  );
   const selectedDashboardSummary =
     dashboardSummaries.find((summary) => summary.slug === selectedDashboardSlug) ?? null;
   const dashboardVersionsByRecency = [...dashboardVersions].sort(
@@ -1934,12 +2675,21 @@ function App() {
     selectedDashboardVersionSummary != null
       ? dateTimeFormatter.format(new Date(selectedDashboardVersionSummary.createdAt))
       : null;
-  const isSelectedStarterDashboard = dashboardDocument.key === starterDashboard.key;
+  const isSelectedStarterDashboard = canvasDashboardDocument.key === starterDashboard.key;
   const isPersistedStarterDashboard = isSelectedStarterDashboard && persistedDashboardVersion != null;
   const isViewingHistoricalDashboardVersion =
     selectedDashboardVersionNumber != null &&
     latestDashboardVersionSummary != null &&
     selectedDashboardVersionNumber !== latestDashboardVersionSummary.versionNumber;
+  const comparableLatestDashboardDocument =
+    isViewingHistoricalDashboardVersion &&
+    latestDashboardDocument != null &&
+    selectedDashboardSummary != null &&
+    latestDashboardVersionSummary != null &&
+    latestDashboardDocument.key === selectedDashboardSummary.slug &&
+    latestDashboardDocument.version === latestDashboardVersionSummary.versionNumber
+      ? latestDashboardDocument
+      : null;
   const isBootstrapManagedStarterDashboard =
     isPersistedStarterDashboard && dashboardOwnerPrincipalKey === starterDashboardBootstrapOwnerKey;
   const isUserManagedStarterDashboard =
@@ -1976,6 +2726,26 @@ function App() {
     : isViewingHistoricalDashboardVersion
       ? `Persist a new latest revision using the currently loaded v${selectedDashboardVersionNumber} document.`
       : `Persist a new latest revision for dashboard '${selectedDashboardSummary.slug}'.`;
+  const isResetLayoutEditorDisabled =
+    currentShellSurface !== 'dashboard-editor' || !isLayoutEditorDirty || isSavingDashboardVersion;
+  const resetLayoutEditorTitle = isResetLayoutEditorDisabled
+    ? isLayoutEditorDirty
+      ? 'Wait for the current save request to finish before resetting the layout draft.'
+      : 'The editor layout already matches the loaded dashboard document.'
+    : 'Discard unsaved layout changes and restore the loaded dashboard document.';
+  const isSaveLayoutEditorDisabled =
+    currentShellSurface !== 'dashboard-editor' ||
+    layoutEditorDocument == null ||
+    !isLayoutEditorDirty ||
+    selectedDashboardSummary == null ||
+    isSavingDashboardVersion;
+  const saveLayoutEditorTitle = isSaveLayoutEditorDisabled
+    ? selectedDashboardSummary == null
+      ? 'Persist the dashboard first before saving editor layout changes.'
+      : !isLayoutEditorDirty
+        ? 'Move at least one panel before saving the edited layout.'
+        : 'Wait for the current save request to finish.'
+    : `Persist the edited layout for dashboard '${selectedDashboardSummary.slug}' as a new version.`;
   const isPublishDashboardVersionDisabled =
     isCreateDashboardVersionDisabled ||
     (isViewingLatestDashboardVersion && latestDashboardVersionSummary?.status === 'published');
@@ -2094,6 +2864,40 @@ function App() {
   const createDashboardTitle = isCreateDashboardDisabled
     ? 'Wait for the current dashboard creation request to finish.'
     : `Clone the currently loaded dashboard into a new persisted slug from ${createDashboardSourceLabel}.`;
+  const selectedDatasetGrantCatalogEntry =
+    datasetGrantCatalog.find((dataset) => dataset.key === datasetGrantDraftDatasetKey) ?? null;
+  const datasetGrantCatalogByKey = new Map(
+    datasetGrantCatalog.map((dataset) => [dataset.key, dataset] as const),
+  );
+  const selectedDatasetUsageSummary = selectedDatasetGrantCatalogEntry?.usage_summary ?? null;
+  const isCreateDatasetGrantDisabled =
+    isSavingDatasetGrant ||
+    datasetGrantDraftDatasetKey.trim().length === 0 ||
+    datasetGrantDraftSubjectKey.trim().length === 0;
+  const createDatasetGrantTitle = isCreateDatasetGrantDisabled
+    ? 'Choose a dataset and subject key before saving a grant.'
+    : `Create or reuse a ${datasetGrantDraftAxis} grant for dataset '${datasetGrantDraftDatasetKey}'.`;
+  const previewDatasetVisibilityTitle =
+    datasetAccessPreviewState === 'loading'
+      ? 'Wait for the current dataset visibility preview request to finish.'
+      : 'Preview and apply the current access context to dataset discovery and runtime execution.';
+  const appliedDatasetAccessHeaderEntries = Object.entries(appliedDatasetAccessHeaders ?? {});
+  const appliedDatasetAccessContextValue =
+    appliedDatasetAccessHeaders == null
+      ? 'Syncing'
+      : appliedDatasetAccessHeaderEntries.length === 0
+        ? 'Public catalog'
+        : appliedDatasetAccessHeaderEntries.length === 1
+          ? `${appliedDatasetAccessHeaderEntries[0][0].replace('X-FLooks-', '')} ${appliedDatasetAccessHeaderEntries[0][1]}`
+          : `${appliedDatasetAccessHeaderEntries.length} headers`;
+  const appliedDatasetAccessContextDetail =
+    appliedDatasetAccessHeaders == null
+      ? 'Waiting for the dataset access preview to apply the current header context.'
+      : appliedDatasetAccessHeaderEntries.length === 0
+        ? 'Runtime queries execute without scoped dataset access headers.'
+        : appliedDatasetAccessHeaderEntries
+            .map(([headerName, value]) => `${headerName.replace('X-FLooks-', '')}: ${value}`)
+            .join(' · ');
   const formattedSelectedDashboardUpdatedAt =
     selectedDashboardSummary != null
       ? dateTimeFormatter.format(new Date(selectedDashboardSummary.updatedAt))
@@ -2139,6 +2943,70 @@ function App() {
             ? ` · last v${selectedDashboardSummary.latestArchivedVersionNumber}`
             : ''
         }`;
+  const latestDashboardRevisionNote =
+    selectedDashboardSummary == null
+      ? null
+      : selectedDashboardSummary.latestVersionSummary ??
+        'No summary was recorded for the latest persisted revision.';
+  const selectedDashboardRevisionNote =
+    selectedDashboardVersionSummary?.summary ??
+    'No summary was recorded for this persisted dashboard revision.';
+  const historicalDashboardVersionComparisonNote =
+    isViewingHistoricalDashboardVersion &&
+    selectedDashboardVersionSummary != null &&
+    latestDashboardVersionSummary != null
+      ? `Viewing v${selectedDashboardVersionSummary.versionNumber} (${selectedDashboardVersionSummary.status}) while latest v${latestDashboardVersionSummary.versionNumber} is ${latestDashboardVersionSummary.status}.`
+      : null;
+  const historicalDashboardLatestRevisionNote =
+    historicalDashboardVersionComparisonNote != null && latestDashboardVersionSummary != null
+      ? latestDashboardVersionSummary.summary ??
+        'No summary was recorded for the latest persisted revision.'
+      : null;
+  const latestComparisonPage =
+    comparableLatestDashboardDocument != null
+      ? getActiveDashboardPage(comparableLatestDashboardDocument, activePageId) ??
+        comparableLatestDashboardDocument.pages[0] ??
+        null
+      : null;
+  const selectedPanelIds = new Set(dashboardDocument.panelLibrary.map((panel) => panel.id));
+  const latestPanelIds = new Set(
+    comparableLatestDashboardDocument?.panelLibrary.map((panel) => panel.id) ?? [],
+  );
+  const latestOnlyPanelTitles =
+    comparableLatestDashboardDocument
+      ?.panelLibrary.filter((panel) => !selectedPanelIds.has(panel.id))
+      .map((panel) => panel.title)
+      .slice(0, 3) ?? [];
+  const historicalOnlyPanelTitles = dashboardDocument.panelLibrary
+    .filter((panel) => !latestPanelIds.has(panel.id))
+    .map((panel) => panel.title)
+    .slice(0, 3);
+  const historicalDashboardStructureDiffTags =
+    comparableLatestDashboardDocument == null
+      ? []
+      : [
+          formatCountDeltaLabel(
+            'Pages',
+            dashboardDocument.pages.length,
+            comparableLatestDashboardDocument.pages.length,
+          ),
+          formatCountDeltaLabel(
+            'Panels',
+            dashboardDocument.panelLibrary.length,
+            comparableLatestDashboardDocument.panelLibrary.length,
+          ),
+          activeDashboardPage == null && latestComparisonPage == null
+            ? 'Active page unavailable'
+            : activeDashboardPage != null && latestComparisonPage == null
+              ? 'Active page removed'
+              : activeDashboardPage == null && latestComparisonPage != null
+                ? `Latest page ${latestComparisonPage.title}`
+                : formatCountDeltaLabel(
+                    'Placements',
+                    activeDashboardPage?.placements.length ?? 0,
+                    latestComparisonPage?.placements.length ?? 0,
+                  ),
+        ];
   const runtimeSnapshotCards = [
     {
       label: 'Dashboard',
@@ -2168,11 +3036,37 @@ function App() {
       value: runtimeLifecycleValue,
       detail: runtimeLifecycleDetail,
     },
+    {
+      label: 'Access context',
+      value: appliedDatasetAccessContextValue,
+      detail: appliedDatasetAccessContextDetail,
+    },
   ];
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
   const heroSummary =
     overview?.summary ??
     'V1은 Linkmerce mart 기반 사내 대시보드 플랫폼으로 시작하고, 이후 다양한 데이터 소스와 커스텀 패널 SDK를 열어가는 구조로 설계합니다.';
+  const showHomeSections = currentShellSurface === 'home';
+  const showDashboardDirectorySection = currentShellSurface === 'dashboards';
+  const showDatasetGrantSection = currentShellSurface === 'grants';
+  const showApiReferenceSection = currentShellSurface === 'reference';
+  const showDashboardCanvasSection =
+    currentShellSurface === 'dashboard-runtime' || currentShellSurface === 'dashboard-editor';
+  const isDashboardEditorRoute = currentShellSurface === 'dashboard-editor';
+  const currentDashboardRuntimePath = buildDashboardRuntimePath(selectedDashboardSlug);
+  const currentDashboardEditorPath = buildDashboardEditorPath(selectedDashboardSlug);
+  const currentSurfaceLabel =
+    currentShellSurface === 'dashboards'
+      ? 'Dashboard directory'
+      : currentShellSurface === 'dashboard-runtime'
+        ? 'Dashboard runtime'
+        : currentShellSurface === 'dashboard-editor'
+          ? 'Dashboard editor'
+          : currentShellSurface === 'grants'
+            ? 'Dataset grants'
+            : currentShellSurface === 'reference'
+              ? 'API reference'
+              : 'Overview';
 
   return (
     <div className="shell">
@@ -2186,17 +3080,42 @@ function App() {
             <span className="heroHint">
               {system ? `${system.name} · ${system.environment} · v${system.version}` : API_BASE_URL}
             </span>
+            <span className="heroHint">Route: {currentSurfaceLabel}</span>
           </div>
           <div className="heroActions" aria-label="Jump to live shell sections">
-            <a className="heroAction" href="#dashboard-directory">
+            <Link className={`heroAction${showHomeSections ? ' heroActionActive' : ''}`} to="/">
+              Overview
+            </Link>
+            <Link
+              className={`heroAction${showDashboardDirectorySection ? ' heroActionActive' : ''}`}
+              to="/dashboards"
+            >
               Browse dashboards
-            </a>
-            <a className="heroAction heroActionPrimary" href="#live-dashboard-runtime">
+            </Link>
+            <Link
+              className={`heroAction heroActionPrimary${currentShellSurface === 'dashboard-runtime' ? ' heroActionActive' : ''}`}
+              to={currentDashboardRuntimePath}
+            >
               Open live dashboard preview
-            </a>
-            <a className="heroAction" href="#api-reference">
+            </Link>
+            <Link
+              className={`heroAction${isDashboardEditorRoute ? ' heroActionActive' : ''}`}
+              to={currentDashboardEditorPath}
+            >
+              Edit current layout
+            </Link>
+            <Link
+              className={`heroAction${showDatasetGrantSection ? ' heroActionActive' : ''}`}
+              to="/grants"
+            >
+              Manage dataset grants
+            </Link>
+            <Link
+              className={`heroAction${showApiReferenceSection ? ' heroActionActive' : ''}`}
+              to="/reference"
+            >
               Browse API reference
-            </a>
+            </Link>
           </div>
           {errorMessage ? <p className="inlineNotice">{errorMessage}</p> : null}
         </div>
@@ -2218,6 +3137,7 @@ function App() {
       </header>
 
       <main className="grid">
+        {showDashboardDirectorySection ? (
         <section className="panel panelWide" id="dashboard-directory">
           <div className="panelHeader">
             <span className="chip">Dashboard Directory</span>
@@ -2426,7 +3346,7 @@ function App() {
                     type="button"
                     className={`dashboardDirectoryCard${isSelectedDashboard ? ' dashboardDirectoryCardActive' : ''}`}
                     key={summary.id}
-                    onClick={() => setSelectedDashboardSlug(summary.slug)}
+                    onClick={() => navigate(buildDashboardRuntimePath(summary.slug))}
                     aria-pressed={isSelectedDashboard}
                     title={
                       isSelectedDashboard
@@ -2448,6 +3368,9 @@ function App() {
                     <p>
                       {summary.description ?? 'No description has been recorded for this dashboard yet.'}
                     </p>
+                    {summary.latestVersionSummary ? (
+                      <p className="runtimeMeta">Latest revision: {summary.latestVersionSummary}</p>
+                    ) : null}
                     <div className="dashboardDirectoryLabels" aria-label="Dashboard summary metadata">
                       <span className="dashboardDirectoryTag">v{summary.latestVersionNumber}</span>
                       <span className="dashboardDirectoryTag">{summary.latestVersionStatus}</span>
@@ -2522,10 +3445,35 @@ function App() {
               </div>
               {selectedDashboardVersionSummary ? (
                 <div className="dashboardVersionSummary">
-                  <p>
-                    {selectedDashboardVersionSummary.summary ??
-                      'No summary was recorded for this persisted dashboard revision.'}
-                  </p>
+                  <p>{selectedDashboardRevisionNote}</p>
+                  {historicalDashboardVersionComparisonNote ? (
+                    <p className="runtimeMeta">{historicalDashboardVersionComparisonNote}</p>
+                  ) : null}
+                  {historicalDashboardLatestRevisionNote && latestDashboardVersionSummary ? (
+                    <p className="runtimeMeta">
+                      Latest v{latestDashboardVersionSummary.versionNumber}: {historicalDashboardLatestRevisionNote}
+                    </p>
+                  ) : null}
+                  {historicalDashboardStructureDiffTags.length > 0 ? (
+                    <>
+                      <span className="runtimeSnapshotLabel">Structural diff</span>
+                      <div className="dashboardDirectoryLabels" aria-label="Historical dashboard structure diff">
+                        {historicalDashboardStructureDiffTags.map((label) => (
+                          <span className="dashboardDirectoryTag" key={label}>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                  {latestOnlyPanelTitles.length > 0 ? (
+                    <p className="runtimeMeta">Latest adds: {formatTitleList(latestOnlyPanelTitles)}.</p>
+                  ) : null}
+                  {historicalOnlyPanelTitles.length > 0 ? (
+                    <p className="runtimeMeta">
+                      Historical-only: {formatTitleList(historicalOnlyPanelTitles)}.
+                    </p>
+                  ) : null}
                   <div className="dashboardDirectoryLabels" aria-label="Selected dashboard version metadata">
                     <span className="dashboardDirectoryTag">
                       {selectedDashboardVersionSummary.status}
@@ -2675,7 +3623,10 @@ function App() {
             </div>
           ) : null}
         </section>
+        ) : null}
 
+        {showHomeSections ? (
+          <>
         <section className="panel panelWide">
           <div className="panelHeader">
             <span className="chip">Launch Tracks</span>
@@ -2790,6 +3741,368 @@ function App() {
           )}
         </section>
 
+          </>
+        ) : null}
+
+        {showDatasetGrantSection ? (
+        <section className="panel panelWide" id="dataset-grants">
+          <div className="panelHeader">
+            <span className="chip">Dataset Grants</span>
+            <h2>Control governed dataset visibility</h2>
+            <p className="sectionSummary">
+              Manage dataset visibility grants from the live shell and preview which datasets the
+              current access context can still discover through the governed-query bootstrap.
+            </p>
+          </div>
+          {datasetGrantNotice ? (
+            <p
+              className={`callout${
+                datasetGrantNoticeTone === 'error'
+                  ? ' calloutError'
+                  : datasetGrantNoticeTone === 'success'
+                    ? ' calloutSuccess'
+                    : ''
+              }`}
+            >
+              {datasetGrantNotice}
+            </p>
+          ) : null}
+          <div className="datasetGrantLayout">
+            <div className="dashboardVersionComposer">
+              <div className="dashboardVersionComposerHeader">
+                <div>
+                  <h3>Preview access context</h3>
+                  <p className="runtimeMeta">
+                    These fields map directly to the `X-FLooks-*` headers used by
+                    <span> </span>
+                    <code>/query/bootstrap</code>.
+                  </p>
+                </div>
+                <span className="dashboardDirectoryTag">
+                  {accessibleDatasets.length} visible dataset
+                  {accessibleDatasets.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              <div className="dashboardVersionComposerFields">
+                <label className="dashboardVersionField">
+                  <span>User key</span>
+                  <input
+                    type="text"
+                    value={datasetAccessPreviewUserKey}
+                    onChange={(event) => setDatasetAccessPreviewUserKey(event.target.value)}
+                    placeholder="owner-1"
+                  />
+                </label>
+                <label className="dashboardVersionField">
+                  <span>Team keys</span>
+                  <input
+                    type="text"
+                    value={datasetAccessPreviewTeamKeys}
+                    onChange={(event) => setDatasetAccessPreviewTeamKeys(event.target.value)}
+                    placeholder="growth,operations"
+                  />
+                </label>
+                <label className="dashboardVersionField">
+                  <span>Department key</span>
+                  <input
+                    type="text"
+                    value={datasetAccessPreviewDepartmentKey}
+                    onChange={(event) => setDatasetAccessPreviewDepartmentKey(event.target.value)}
+                    placeholder="commerce"
+                  />
+                </label>
+                <label className="dashboardVersionField">
+                  <span>Role key</span>
+                  <input
+                    type="text"
+                    value={datasetAccessPreviewRoleKey}
+                    onChange={(event) => setDatasetAccessPreviewRoleKey(event.target.value)}
+                    placeholder="analyst"
+                  />
+                </label>
+                <label className="dashboardVersionField dashboardVersionFieldWide">
+                  <span>Workspace key</span>
+                  <input
+                    type="text"
+                    value={datasetAccessPreviewWorkspaceKey}
+                    onChange={(event) => setDatasetAccessPreviewWorkspaceKey(event.target.value)}
+                    placeholder="primary"
+                  />
+                </label>
+              </div>
+              <div className="dashboardVersionComposerActions">
+                <p className="runtimeMeta">
+                  Refresh the preview after changing the access context to apply the same headers to
+                  both dataset discovery and the live dashboard runtime.
+                </p>
+                <button
+                  type="button"
+                  className="runtimeControl"
+                  disabled={datasetAccessPreviewState === 'loading'}
+                  onClick={() => {
+                    void loadAccessibleDatasetPreview();
+                  }}
+                  title={previewDatasetVisibilityTitle}
+                >
+                  {datasetAccessPreviewState === 'loading'
+                    ? 'Applying context...'
+                    : 'Preview and apply context'}
+                </button>
+              </div>
+              {datasetAccessPreviewErrorMessage ? (
+                <p className="callout calloutError">{datasetAccessPreviewErrorMessage}</p>
+              ) : accessibleDatasets.length > 0 ? (
+                <div className="datasetGrantDatasetList">
+                  {accessibleDatasets.map((dataset) => (
+                    <article className="datasetGrantDatasetCard" key={dataset.key}>
+                      <div className="datasetGrantCardHeader">
+                        <div>
+                          <strong>{dataset.label}</strong>
+                          <p className="runtimeMeta">{dataset.key}</p>
+                        </div>
+                        <span className="runtimeStatusPill runtimeStatusPillManaged">Visible</span>
+                      </div>
+                      <p>{dataset.description}</p>
+                      <div className="dashboardDirectoryLabels" aria-label={`Grant axes for ${dataset.key}`}>
+                        {dataset.visibility.grantAxes.map((grantAxis) => (
+                          <span className="dashboardDirectoryTag" key={`${dataset.key}-${grantAxis}`}>
+                            {grantAxis}
+                          </span>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="callout">
+                  {datasetAccessPreviewState === 'loading'
+                    ? 'Loading the access-filtered dataset bootstrap...'
+                    : 'No datasets are currently visible for this access context.'}
+                </p>
+              )}
+            </div>
+
+            <div className="dashboardVersionComposer">
+              <div className="dashboardVersionComposerHeader">
+                <div>
+                  <h3>Create dataset grant</h3>
+                  <p className="runtimeMeta">
+                    Create or reuse a visibility grant without dropping into direct SQL.
+                  </p>
+                </div>
+                <span className="dashboardDirectoryTag">
+                  Catalog {datasetGrantCatalog.length}
+                </span>
+              </div>
+              <div className="dashboardVersionComposerFields">
+                <label className="dashboardVersionField">
+                  <span>Dataset</span>
+                  <select
+                    value={datasetGrantDraftDatasetKey}
+                    onChange={(event) => setDatasetGrantDraftDatasetKey(event.target.value)}
+                  >
+                    {datasetGrantCatalog.map((dataset) => (
+                      <option value={dataset.key} key={dataset.key}>
+                        {dataset.label} ({dataset.key})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="dashboardVersionField">
+                  <span>Grant axis</span>
+                  <select
+                    value={datasetGrantDraftAxis}
+                    onChange={(event) => setDatasetGrantDraftAxis(event.target.value as DatasetGrantAxis)}
+                  >
+                    {datasetGrantAxes.map((grantAxis) => (
+                      <option value={grantAxis} key={grantAxis}>
+                        {grantAxis}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="dashboardVersionField">
+                  <span>Subject key</span>
+                  <input
+                    type="text"
+                    value={datasetGrantDraftSubjectKey}
+                    onChange={(event) => setDatasetGrantDraftSubjectKey(event.target.value)}
+                    placeholder="primary"
+                  />
+                </label>
+                <label className="dashboardVersionField">
+                  <span>Granted by</span>
+                  <input
+                    type="text"
+                    value={datasetGrantDraftGrantedBy}
+                    onChange={(event) => setDatasetGrantDraftGrantedBy(event.target.value)}
+                    placeholder="web-shell"
+                  />
+                </label>
+              </div>
+              {selectedDatasetGrantCatalogEntry ? (
+                <div className="datasetGrantFormMeta">
+                  <p className="runtimeMeta">{selectedDatasetGrantCatalogEntry.description}</p>
+                  <div
+                    className="dashboardDirectoryLabels"
+                    aria-label={`Allowed grant axes for ${selectedDatasetGrantCatalogEntry.key}`}
+                  >
+                    {selectedDatasetGrantCatalogEntry.grant_axes.map((grantAxis) => (
+                      <span className="dashboardDirectoryTag" key={`${selectedDatasetGrantCatalogEntry.key}-${grantAxis}`}>
+                        {grantAxis}
+                      </span>
+                    ))}
+                  </div>
+                  {selectedDatasetUsageSummary ? (
+                    <div className="datasetGrantImpactSummary">
+                      <strong>
+                        Affects {selectedDatasetUsageSummary.dashboard_count} dashboard
+                        {selectedDatasetUsageSummary.dashboard_count === 1 ? '' : 's'} and{' '}
+                        {selectedDatasetUsageSummary.panel_count} panel
+                        {selectedDatasetUsageSummary.panel_count === 1 ? '' : 's'}.
+                      </strong>
+                      {selectedDatasetUsageSummary.sample_panels.length > 0 ? (
+                        <div
+                          className="dashboardDirectoryLabels"
+                          aria-label={`Sample panel usage for ${selectedDatasetGrantCatalogEntry.key}`}
+                        >
+                          {selectedDatasetUsageSummary.sample_panels.map((panelUsage) => (
+                            <span
+                              className="dashboardDirectoryTag"
+                              key={`${panelUsage.dashboard_slug}-${panelUsage.panel_id}`}
+                            >
+                              {panelUsage.dashboard_slug} · {panelUsage.panel_title}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="runtimeMeta">
+                          No latest persisted dashboard panels reference this dataset yet.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="dashboardVersionComposerActions">
+                <p className="runtimeMeta">
+                  New grants affect the governed-query bootstrap preview immediately after they are saved.
+                </p>
+                <button
+                  type="button"
+                  className="runtimeControl"
+                  disabled={isCreateDatasetGrantDisabled}
+                  onClick={() => {
+                    void handleCreateDatasetGrant();
+                  }}
+                  title={createDatasetGrantTitle}
+                >
+                  {isSavingDatasetGrant ? 'Saving grant...' : 'Save dataset grant'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="datasetGrantSectionHeader">
+            <div>
+              <h3>Persisted grants</h3>
+              <p className="runtimeMeta">
+                {datasetGrants.length} active grant{datasetGrants.length === 1 ? '' : 's'} in the
+                metadata store.
+              </p>
+            </div>
+            {selectedDatasetGrantCatalogEntry ? (
+              <span className="dashboardDirectoryTag">
+                Selected {selectedDatasetGrantCatalogEntry.key}
+              </span>
+            ) : null}
+          </div>
+          {datasetGrantErrorMessage ? (
+            <p className="callout calloutError">{datasetGrantErrorMessage}</p>
+          ) : datasetGrants.length > 0 ? (
+            <div className="datasetGrantList">
+              {datasetGrants.map((grant) => (
+                <article className="datasetGrantCard" key={grant.id}>
+                  <div className="datasetGrantCardHeader">
+                    <div>
+                      <strong>{grant.dataset_key}</strong>
+                      <p className="runtimeMeta">
+                        {grant.grant_axis} · {grant.subject_key}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="runtimeControl"
+                      disabled={deletingDatasetGrantId === grant.id}
+                      onClick={() => {
+                        void handleDeleteDatasetGrant(grant);
+                      }}
+                      title={`Delete dataset grant '${grant.dataset_key} / ${grant.grant_axis} / ${grant.subject_key}'.`}
+                    >
+                      {deletingDatasetGrantId === grant.id ? 'Deleting...' : 'Delete grant'}
+                    </button>
+                  </div>
+                  <div className="dashboardDirectoryLabels" aria-label={`Persisted dataset grant ${grant.id}`}>
+                    <span className="dashboardDirectoryTag">{grant.grant_axis}</span>
+                    <span className="dashboardDirectoryTag">{grant.subject_key}</span>
+                    {grant.granted_by ? (
+                      <span className="dashboardDirectoryTag">By {grant.granted_by}</span>
+                    ) : null}
+                    <span className="dashboardDirectoryTag">
+                      Created {dateTimeFormatter.format(new Date(grant.created_at))}
+                    </span>
+                  </div>
+                  {datasetGrantCatalogByKey.get(grant.dataset_key)?.usage_summary ? (
+                    <div className="datasetGrantImpactSummary">
+                      <strong>
+                        Impact: {datasetGrantCatalogByKey.get(grant.dataset_key)?.usage_summary.dashboard_count ?? 0}{' '}
+                        dashboard
+                        {(datasetGrantCatalogByKey.get(grant.dataset_key)?.usage_summary.dashboard_count ?? 0) === 1
+                          ? ''
+                          : 's'}
+                        {' · '}
+                        {datasetGrantCatalogByKey.get(grant.dataset_key)?.usage_summary.panel_count ?? 0}{' '}
+                        panel
+                        {(datasetGrantCatalogByKey.get(grant.dataset_key)?.usage_summary.panel_count ?? 0) === 1
+                          ? ''
+                          : 's'}
+                      </strong>
+                      {(datasetGrantCatalogByKey.get(grant.dataset_key)?.usage_summary.sample_panels.length ?? 0) > 0 ? (
+                        <div
+                          className="dashboardDirectoryLabels"
+                          aria-label={`Persisted impact preview for ${grant.dataset_key}`}
+                        >
+                          {datasetGrantCatalogByKey.get(grant.dataset_key)?.usage_summary.sample_panels.map((panelUsage) => (
+                            <span
+                              className="dashboardDirectoryTag"
+                              key={`${grant.id}-${panelUsage.dashboard_slug}-${panelUsage.panel_id}`}
+                            >
+                              {panelUsage.dashboard_slug} · {panelUsage.panel_title}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="runtimeMeta">
+                          No latest persisted dashboard panels currently depend on this dataset.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="callout">
+              {datasetGrantState === 'loading'
+                ? 'Loading dataset grants from the metadata store...'
+                : 'No dataset grants are persisted yet. Datasets stay public until a grant row exists.'}
+            </p>
+          )}
+        </section>
+
+        ) : null}
+
+        {showApiReferenceSection ? (
         <section className="panel panelWide" id="api-reference">
           <div className="panelHeader">
             <span className="chip">API Reference</span>
@@ -2917,15 +4230,24 @@ function App() {
           )}
         </section>
 
+        ) : null}
+
+        {showDashboardCanvasSection ? (
+          <>
         <section className="panel panelWide" id="live-dashboard-runtime">
           <div className="panelHeader">
-            <span className="chip">Dashboard Runtime</span>
-            <h2>Live dashboard preview</h2>
+            <span className="chip">{isDashboardEditorRoute ? 'Dashboard Editor' : 'Dashboard Runtime'}</span>
+            <h2>{isDashboardEditorRoute ? 'Layout editor' : 'Live dashboard preview'}</h2>
             <p className="sectionSummary">
-              The web shell reads first-party panel definitions from the active dashboard page,
-              preserves their placement order, and executes each supported panel through the live
-              query execution API.
+              {isDashboardEditorRoute
+                ? 'This dedicated editor route isolates layout work from the read-only runtime preview. Drag-and-drop placement editing lands on top of this surface next.'
+                : 'The web shell reads first-party panel definitions from the active dashboard page, preserves their placement order, and executes each supported panel through the live query execution API using the same applied dataset access context from the Dataset Grants panel.'}
             </p>
+            {isDashboardEditorRoute ? (
+              <p className="callout">
+                The editor route is live. This batch opens the dedicated editing surface before layout drag persistence is wired in.
+              </p>
+            ) : null}
             <div className="runtimeSnapshot" aria-label="Dashboard runtime summary">
               {runtimeSnapshotCards.map((card) => (
                 <article className="runtimeSnapshotCard" key={card.label}>
@@ -2935,8 +4257,101 @@ function App() {
                 </article>
               ))}
             </div>
+            {latestDashboardRevisionNote ? (
+              <div className="dashboardVersionSummary" aria-label="Latest dashboard revision note">
+                <span className="runtimeSnapshotLabel">Latest revision note</span>
+                <p>{latestDashboardRevisionNote}</p>
+                {historicalDashboardVersionComparisonNote ? (
+                  <p className="runtimeMeta">{historicalDashboardVersionComparisonNote}</p>
+                ) : null}
+                {historicalDashboardVersionComparisonNote && latestDashboardVersionSummary ? (
+                  <p className="runtimeMeta">
+                    Latest v{latestDashboardVersionSummary.versionNumber}: {historicalDashboardLatestRevisionNote}
+                  </p>
+                ) : null}
+                {historicalDashboardStructureDiffTags.length > 0 ? (
+                  <>
+                    <span className="runtimeSnapshotLabel">Structural diff</span>
+                    <div className="dashboardDirectoryLabels" aria-label="Runtime structural diff">
+                      {historicalDashboardStructureDiffTags.map((label) => (
+                        <span className="dashboardDirectoryTag" key={`runtime-${label}`}>
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+                {latestOnlyPanelTitles.length > 0 ? (
+                  <p className="runtimeMeta">Latest adds: {formatTitleList(latestOnlyPanelTitles)}.</p>
+                ) : null}
+                {historicalOnlyPanelTitles.length > 0 ? (
+                  <p className="runtimeMeta">Historical-only: {formatTitleList(historicalOnlyPanelTitles)}.</p>
+                ) : null}
+                <div className="dashboardDirectoryLabels" aria-label="Latest dashboard revision metadata">
+                  <span className="dashboardDirectoryTag">
+                    Latest v{selectedDashboardSummary?.latestVersionNumber}
+                  </span>
+                  <span className="dashboardDirectoryTag">
+                    {selectedDashboardSummary?.latestVersionStatus}
+                  </span>
+                  {!isViewingLatestDashboardVersion ? (
+                    <span className="dashboardDirectoryTag">Viewing v{dashboardDocument.version}</span>
+                  ) : null}
+                  {historicalDashboardVersionComparisonNote && selectedDashboardVersionSummary ? (
+                    <span className="dashboardDirectoryTag">
+                      {selectedDashboardVersionSummary.status} to {latestDashboardVersionSummary?.status}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <div className="runtimeToolbar">
               <p className="runtimeMeta">{dashboardSourceLabel} · {dashboardDocument.key}</p>
+              <div className="runtimeControlGroup" aria-label="Dashboard surface navigation">
+                <Link
+                  className={`runtimeControl${!isDashboardEditorRoute ? ' runtimeControlActive' : ''}`}
+                  to={currentDashboardRuntimePath}
+                >
+                  Runtime view
+                </Link>
+                <Link
+                  className={`runtimeControl${isDashboardEditorRoute ? ' runtimeControlActive' : ''}`}
+                  to={currentDashboardEditorPath}
+                >
+                  Edit layout
+                </Link>
+              </div>
+              {isDashboardEditorRoute ? (
+                <>
+                  <p className="runtimeMeta">
+                    {isLayoutEditorDirty
+                      ? 'Unsaved layout changes are isolated to this editor route until you save a new version.'
+                      : 'Drag panels to move them, use the resize handle to change size, then save the layout as a new dashboard version.'}
+                  </p>
+                  <div className="runtimeControlGroup" aria-label="Layout editor actions">
+                    <button
+                      type="button"
+                      className="runtimeControl"
+                      disabled={isResetLayoutEditorDisabled}
+                      onClick={handleResetLayoutEditor}
+                      title={resetLayoutEditorTitle}
+                    >
+                      Reset layout
+                    </button>
+                    <button
+                      type="button"
+                      className={`runtimeControl${isLayoutEditorDirty ? ' runtimeControlActive' : ''}`}
+                      disabled={isSaveLayoutEditorDisabled}
+                      onClick={() => {
+                        void handleSaveLayoutEditor();
+                      }}
+                      title={saveLayoutEditorTitle}
+                    >
+                      {isSavingDashboardVersion ? 'Saving layout...' : 'Save layout'}
+                    </button>
+                  </div>
+                </>
+              ) : null}
               {activeDashboardPage ? (
                 <p className="runtimeMeta">
                   Active page: {activeDashboardPage.title} · {activeDashboardPage.placements.length}{' '}
@@ -3171,9 +4586,9 @@ function App() {
               {dashboardNotice}
             </p>
           ) : null}
-          {dashboardDocument.pages.length > 1 ? (
+          {canvasDashboardDocument.pages.length > 1 ? (
             <div className="pageSelector" aria-label="Dashboard pages">
-              {dashboardDocument.pages.map((page) => (
+              {canvasDashboardDocument.pages.map((page) => (
                 <button
                   type="button"
                   className={`pageTab${page.id === activeDashboardPage?.id ? ' pageTabActive' : ''}`}
@@ -3206,19 +4621,71 @@ function App() {
                   onWheel={handleRuntimeCanvasWheel}
                   tabIndex={0}
                 >
-                  <div className="runtimePanelList runtimeCanvas" style={runtimeCanvasStyle}>
+                  <div
+                    className={`runtimePanelList runtimeCanvas${isDashboardEditorRoute ? ' runtimeCanvasEditor' : ''}`}
+                    style={runtimeCanvasStyle}
+                  >
                     {dashboardRuntimePanelEntries.map(({ panel, placement }) => {
                       const runtime = panelRuntime[panel.id];
                       const runtimePanelKey = `${panel.id}-${placement.x}-${placement.y}-${placement.zIndex}`;
                       const runtimePanelStyle = runtimeGridMetrics
                         ? getRuntimePanelStyle(placement, runtimeGridMetrics)
                         : undefined;
+                      const isDraggingEditorPanel =
+                        isDashboardEditorRoute &&
+                        layoutEditorDragState?.panelId === panel.id &&
+                        layoutEditorDragState.mode === 'move';
+                      const isResizingEditorPanel =
+                        isDashboardEditorRoute &&
+                        layoutEditorDragState?.panelId === panel.id &&
+                        layoutEditorDragState.mode === 'resize';
+                      const runtimeCanvasItemClassName = `${isDashboardEditorRoute ? ' runtimeCanvasItemEditor' : ''}${isDraggingEditorPanel ? ' runtimeCanvasItemDragging' : ''}${isResizingEditorPanel ? ' runtimeCanvasItemResizing' : ''}`;
+                      const editorPointerHandlers = isDashboardEditorRoute
+                        ? {
+                            onPointerDown: (event: ReactPointerEvent<HTMLElement>) =>
+                              handleLayoutEditorPointerDown(event, activeDashboardPage, placement),
+                            onPointerMove: (event: ReactPointerEvent<HTMLElement>) =>
+                              handleLayoutEditorPointerMove(event, activeDashboardPage, placement),
+                            onPointerUp: (event: ReactPointerEvent<HTMLElement>) =>
+                              handleLayoutEditorPointerEnd(event),
+                            onPointerCancel: (event: ReactPointerEvent<HTMLElement>) =>
+                              handleLayoutEditorPointerEnd(event),
+                          }
+                        : {};
+                      const editorResizeHandle = isDashboardEditorRoute ? (
+                        <button
+                          type="button"
+                          aria-label={`Resize ${panel.title}`}
+                          className="runtimeEditorResizeHandle"
+                          onPointerDown={(event) =>
+                            handleLayoutEditorResizePointerDown(event, activeDashboardPage, placement)
+                          }
+                          onPointerMove={(event) => {
+                            event.stopPropagation();
+                            handleLayoutEditorPointerMove(event, activeDashboardPage, placement);
+                          }}
+                          onPointerUp={(event) => {
+                            event.stopPropagation();
+                            handleLayoutEditorPointerEnd(event);
+                          }}
+                          onPointerCancel={(event) => {
+                            event.stopPropagation();
+                            handleLayoutEditorPointerEnd(event);
+                          }}
+                          title={`Resize panel '${panel.title}'`}
+                        />
+                      ) : null;
 
                       if (isScorecardPanel(panel)) {
                         const value = runtime?.data?.results[0]?.[panel.scorecard.valueField];
 
                         return (
-                          <article className="runtimeCanvasItem runtimeStat" key={runtimePanelKey} style={runtimePanelStyle}>
+                          <article
+                            className={`runtimeCanvasItem runtimeStat${runtimeCanvasItemClassName}`}
+                            key={runtimePanelKey}
+                            style={runtimePanelStyle}
+                            {...editorPointerHandlers}
+                          >
                             <span>{panel.title}</span>
                             <strong>
                               {runtime?.state === 'ready'
@@ -3245,13 +4712,19 @@ function App() {
                             {runtime?.state === 'error' && runtime.errorMessage ? (
                               <p className="inlineNotice">{runtime.errorMessage}</p>
                             ) : null}
+                            {editorResizeHandle}
                           </article>
                         );
                       }
 
                       if (isTablePanel(panel)) {
                         return (
-                          <div className="runtimeCanvasItem runtimeTableCard" key={runtimePanelKey} style={runtimePanelStyle}>
+                          <div
+                            className={`runtimeCanvasItem runtimeTableCard${runtimeCanvasItemClassName}`}
+                            key={runtimePanelKey}
+                            style={runtimePanelStyle}
+                            {...editorPointerHandlers}
+                          >
                             <div className="runtimeTableHeader">
                               <span className="kicker">{panel.title}</span>
                               <span className="queryBadge">
@@ -3297,6 +4770,7 @@ function App() {
                                 Executing the active dashboard table panel against {API_BASE_URL}/query/execute
                               </p>
                             )}
+                            {editorResizeHandle}
                           </div>
                         );
                       }
@@ -3310,7 +4784,12 @@ function App() {
                         const linePath = getRuntimeLineChartPath(chartData);
 
                         return (
-                          <article className="runtimeCanvasItem runtimeChartCard" key={runtimePanelKey} style={runtimePanelStyle}>
+                          <article
+                            className={`runtimeCanvasItem runtimeChartCard${runtimeCanvasItemClassName}`}
+                            key={runtimePanelKey}
+                            style={runtimePanelStyle}
+                            {...editorPointerHandlers}
+                          >
                             <div className="runtimeTableHeader">
                               <span className="kicker">{panel.title}</span>
                               <span className="queryBadge">
@@ -3434,6 +4913,7 @@ function App() {
                                 ? `${runtime.data.executionMetadata.durationMs} ms`
                                 : 'Awaiting panel result'}
                             </p>
+                            {editorResizeHandle}
                           </article>
                         );
                       }
@@ -3442,7 +4922,12 @@ function App() {
                         const noticeFacts = getRuntimeNoticeFacts(runtime);
 
                         return (
-                          <article className="runtimeCanvasItem runtimeNoticeCard" key={runtimePanelKey} style={runtimePanelStyle}>
+                          <article
+                            className={`runtimeCanvasItem runtimeNoticeCard${runtimeCanvasItemClassName}`}
+                            key={runtimePanelKey}
+                            style={runtimePanelStyle}
+                            {...editorPointerHandlers}
+                          >
                             <div className="runtimeTableHeader">
                               <span className="kicker">{panel.title}</span>
                               <span className="queryBadge">notice</span>
@@ -3481,12 +4966,18 @@ function App() {
                               </p>
                             ) : null}
                             <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+                            {editorResizeHandle}
                           </article>
                         );
                       }
 
                       return (
-                        <article className="runtimeCanvasItem runtimeFallbackCard" key={runtimePanelKey} style={runtimePanelStyle}>
+                        <article
+                          className={`runtimeCanvasItem runtimeFallbackCard${runtimeCanvasItemClassName}`}
+                          key={runtimePanelKey}
+                          style={runtimePanelStyle}
+                          {...editorPointerHandlers}
+                        >
                           <div className="runtimeTableHeader">
                             <span className="kicker">{panel.title}</span>
                             <span className="queryBadge">{panel.kind}</span>
@@ -3497,6 +4988,7 @@ function App() {
                           </p>
                           <p className="runtimeMeta">{panel.datasetKey}</p>
                           <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+                          {editorResizeHandle}
                         </article>
                       );
                     })}
@@ -3512,7 +5004,7 @@ function App() {
             <span className="chip">Dashboard Document</span>
             <h2>Page and library seed data</h2>
             <p className="runtimeMeta">
-              {dashboardSourceLabel} · {dashboardDocument.pages.length} pages · {dashboardDocument.panelLibrary.length}{' '}
+              {dashboardSourceLabel} · {canvasDashboardDocument.pages.length} pages · {canvasDashboardDocument.panelLibrary.length}{' '}
               library panels
             </p>
           </div>
@@ -3520,7 +5012,7 @@ function App() {
             <div>
               <h3>Pages</h3>
               <p>
-                {dashboardDocument.pages
+                {canvasDashboardDocument.pages
                   .map(
                     (page) =>
                       `${page.title} (${page.width}×${page.height}px, ${page.placements.length} placements)`,
@@ -3531,13 +5023,16 @@ function App() {
             <div>
               <h3>Panel Library</h3>
               <p>
-                {dashboardDocument.panelLibrary
+                {canvasDashboardDocument.panelLibrary
                   .map((panel) => `${panel.title} (${panel.kind})`)
                   .join(' / ')}
               </p>
             </div>
           </div>
         </section>
+
+          </>
+        ) : null}
       </main>
     </div>
   );

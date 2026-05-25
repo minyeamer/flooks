@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from collections.abc import Generator
 
 import pytest
@@ -63,6 +64,7 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert created_body["document"]["title"] == "Commerce Home"
     assert created_body["latestVersionNumber"] == 1
     assert created_body["latestVersionStatus"] == "draft"
+    assert created_body["latestVersionSummary"] == "Initial bootstrap version."
     assert created_body["publishedVersionCount"] == 0
     assert created_body["latestPublishedVersionNumber"] is None
     assert created_body["archivedVersionCount"] == 0
@@ -93,6 +95,7 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert len(list_body) == 1
     assert list_body[0]["slug"] == "commerce-home"
     assert list_body[0]["latestVersionNumber"] == 1
+    assert list_body[0]["latestVersionSummary"] == "Initial bootstrap version."
     assert list_body[0]["publishedVersionCount"] == 0
     assert list_body[0]["latestPublishedVersionNumber"] is None
     assert list_body[0]["archivedVersionCount"] == 0
@@ -116,6 +119,7 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert updated_body["document"]["version"] == 2
     assert updated_body["latestVersionNumber"] == 2
     assert updated_body["latestVersionStatus"] == "published"
+    assert updated_body["latestVersionSummary"] == "Add scorecard page layout."
     assert updated_body["publishedVersionCount"] == 1
     assert updated_body["latestPublishedVersionNumber"] == 2
     assert updated_body["archivedVersionCount"] == 0
@@ -131,6 +135,7 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert refreshed_list_response.status_code == 200
     refreshed_list_body = refreshed_list_response.json()
     assert refreshed_list_body[0]["latestVersionStatus"] == "published"
+    assert refreshed_list_body[0]["latestVersionSummary"] == "Add scorecard page layout."
     assert refreshed_list_body[0]["publishedVersionCount"] == 1
     assert refreshed_list_body[0]["latestPublishedVersionNumber"] == 2
     assert refreshed_list_body[0]["archivedVersionCount"] == 0
@@ -172,6 +177,102 @@ def test_dashboard_create_rejects_mismatched_document_key(dashboard_client: Test
     assert response.json()["detail"] == {
         "field": "document.key",
         "message": "Dashboard document key 'other-dashboard' must match slug 'commerce-home'.",
+    }
+
+
+def test_dashboard_create_rejects_unknown_panel_dataset(dashboard_client: TestClient) -> None:
+    document = _build_dashboard_document(version=1)
+    document["panelLibrary"][0]["datasetKey"] = "missing_dataset"
+    document["panelLibrary"][0]["query"]["datasetKey"] = "missing_dataset"
+
+    response = dashboard_client.post(
+        "/api/v1/dashboards",
+        json={
+            "slug": "commerce-home",
+            "description": "Primary executive dashboard.",
+            "ownerPrincipalKind": "user",
+            "ownerPrincipalKey": "owner-1",
+            "createdBy": "owner-1",
+            "document": document,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {
+        "field": "document.panelLibrary[0].query.datasetKey",
+        "message": "Unknown dataset 'missing_dataset'.",
+    }
+
+
+def test_dashboard_update_rejects_scorecard_value_field_outside_query_result(
+    dashboard_client: TestClient,
+) -> None:
+    create_response = dashboard_client.post(
+        "/api/v1/dashboards",
+        json={
+            "slug": "commerce-home",
+            "description": "Primary executive dashboard.",
+            "ownerPrincipalKind": "user",
+            "ownerPrincipalKey": "owner-1",
+            "createdBy": "owner-1",
+            "document": _build_dashboard_document(version=1),
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    invalid_document = deepcopy(create_response.json()["document"])
+    invalid_document["panelLibrary"][0]["scorecard"]["valueField"] = "profit"
+
+    response = dashboard_client.put(
+        "/api/v1/dashboards/commerce-home",
+        json={
+            "createdBy": "owner-2",
+            "summary": "Attempt invalid scorecard field.",
+            "document": invalid_document,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {
+        "field": "document.panelLibrary[0].scorecard.valueField",
+        "message": "Scorecard value field 'profit' is not returned by the panel query.",
+    }
+
+
+def test_dashboard_update_rejects_placement_panel_id_outside_panel_library(
+    dashboard_client: TestClient,
+) -> None:
+    create_response = dashboard_client.post(
+        "/api/v1/dashboards",
+        json={
+            "slug": "commerce-home",
+            "description": "Primary executive dashboard.",
+            "ownerPrincipalKind": "user",
+            "ownerPrincipalKey": "owner-1",
+            "createdBy": "owner-1",
+            "document": _build_dashboard_document(version=1),
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    invalid_document = deepcopy(create_response.json()["document"])
+    invalid_document["pages"][0]["placements"][0]["panelId"] = "missing-panel"
+
+    response = dashboard_client.put(
+        "/api/v1/dashboards/commerce-home",
+        json={
+            "createdBy": "owner-2",
+            "summary": "Attempt invalid layout placement reference.",
+            "document": invalid_document,
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {
+        "field": "document.pages[0].placements[0].panelId",
+        "message": "Placement panelId 'missing-panel' does not match any panel in the panel library.",
     }
 
 

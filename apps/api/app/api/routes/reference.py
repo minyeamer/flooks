@@ -34,6 +34,7 @@ async def get_api_reference() -> ApiReferenceResponse:
         ApiFieldReference(name="ownerPrincipalKey", type="string", description="owner principal key입니다."),
         ApiFieldReference(name="latestVersionNumber", type="integer", description="가장 최신 revision 번호입니다."),
         ApiFieldReference(name="latestVersionStatus", type="string", description="최신 revision 상태입니다.", enum_values=["draft", "published", "archived"]),
+        ApiFieldReference(name="latestVersionSummary", type="string | null", description="가장 최신 revision 요약입니다.", required=False),
         ApiFieldReference(name="publishedVersionCount", type="integer", description="published 상태 revision 개수입니다."),
         ApiFieldReference(name="latestPublishedVersionNumber", type="integer | null", description="가장 최근 published revision 번호입니다.", required=False),
         ApiFieldReference(name="archivedVersionCount", type="integer", description="archived 상태 revision 개수입니다."),
@@ -50,6 +51,7 @@ async def get_api_reference() -> ApiReferenceResponse:
         ApiFieldReference(name="[].ownerPrincipalKey", type="string", description="owner principal key입니다."),
         ApiFieldReference(name="[].latestVersionNumber", type="integer", description="가장 최신 revision 번호입니다."),
         ApiFieldReference(name="[].latestVersionStatus", type="string", description="최신 revision 상태입니다.", enum_values=["draft", "published", "archived"]),
+        ApiFieldReference(name="[].latestVersionSummary", type="string | null", description="가장 최신 revision 요약입니다.", required=False),
         ApiFieldReference(name="[].publishedVersionCount", type="integer", description="published 상태 revision 개수입니다."),
         ApiFieldReference(name="[].latestPublishedVersionNumber", type="integer | null", description="가장 최근 published revision 번호입니다.", required=False),
         ApiFieldReference(name="[].archivedVersionCount", type="integer", description="archived 상태 revision 개수입니다."),
@@ -203,6 +205,124 @@ async def get_api_reference() -> ApiReferenceResponse:
                 openapi_href="/docs#/identity/get_identity_bootstrap_api_v1_identity_bootstrap_get",
             ),
             ApiEndpointReference(
+                id="identity-dataset-grants-list",
+                method="GET",
+                path=f"{api_prefix}/identity/dataset-grants",
+                summary="List dataset grants",
+                description="현재 metadata store에 저장된 dataset visibility grant 목록을 반환합니다.",
+                parameters=[],
+                responses=[
+                    ApiResponseReference(
+                        status_code=200,
+                        description="dataset grant 목록을 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="catalog_datasets[].key", type="string", description="grant 관리 UI가 사용할 dataset key입니다.", example="mart_commerce_daily"),
+                            ApiFieldReference(name="catalog_datasets[].label", type="string", description="표시용 dataset 이름입니다.", example="Commerce Daily"),
+                            ApiFieldReference(name="catalog_datasets[].description", type="string", description="dataset 용도 설명입니다."),
+                            ApiFieldReference(name="catalog_datasets[].grant_axes[]", type="string[]", description="이 dataset이 평가하는 grant 축 목록입니다."),
+                            ApiFieldReference(name="catalog_datasets[].usage_summary.dashboard_count", type="integer", description="이 dataset을 참조하는 최신 persisted dashboard 수입니다.", example=1),
+                            ApiFieldReference(name="catalog_datasets[].usage_summary.panel_count", type="integer", description="이 dataset을 참조하는 최신 persisted panel 수입니다.", example=7),
+                            ApiFieldReference(name="catalog_datasets[].usage_summary.sample_panels[].dashboard_slug", type="string", description="영향받는 dashboard slug 예시입니다.", example="commerce-home-usage"),
+                            ApiFieldReference(name="catalog_datasets[].usage_summary.sample_panels[].panel_title", type="string", description="영향받는 panel title 예시입니다.", example="GMV"),
+                            ApiFieldReference(name="catalog_datasets[].usage_summary.sample_panels[].panel_kind", type="string", description="영향받는 panel kind 예시입니다.", example="scorecard"),
+                            ApiFieldReference(name="grants[].id", type="string", description="dataset grant UUID입니다."),
+                            ApiFieldReference(name="grants[].dataset_key", type="string", description="grant가 적용되는 dataset key입니다.", example="mart_commerce_daily"),
+                            ApiFieldReference(name="grants[].grant_axis", type="string", description="grant 평가 축입니다.", example="workspace"),
+                            ApiFieldReference(name="grants[].subject_key", type="string", description="해당 축에서 허용된 subject key입니다.", example="primary"),
+                            ApiFieldReference(name="grants[].granted_by", type="string | null", description="grant를 생성한 actor입니다.", required=False, example="owner-1"),
+                            ApiFieldReference(name="grants[].created_at", type="string", description="grant 생성 시각입니다."),
+                        ],
+                    ),
+                ],
+                openapi_href="/docs#/identity/list_dataset_grants_api_v1_identity_dataset_grants_get",
+            ),
+            ApiEndpointReference(
+                id="identity-dataset-grants-upsert",
+                method="PUT",
+                path=f"{api_prefix}/identity/dataset-grants",
+                summary="Create or reuse dataset grant",
+                description="dataset manifest에 존재하는 dataset key에 대해 dataset visibility grant를 생성합니다. 동일한 natural key가 이미 있으면 기존 grant를 그대로 반환합니다.",
+                parameters=[
+                    ApiFieldReference(name="dataset_key", type="string", description="grant를 적용할 dataset key입니다.", example="mart_commerce_daily"),
+                    ApiFieldReference(name="grant_axis", type="string", description="grant 평가 축입니다.", example="workspace", enum_values=["user", "team", "department", "role", "workspace"]),
+                    ApiFieldReference(name="subject_key", type="string", description="허용할 subject key입니다.", example="primary"),
+                    ApiFieldReference(name="granted_by", type="string | null", description="grant를 남긴 actor 식별자입니다.", required=False, example="owner-1"),
+                ],
+                responses=[
+                    ApiResponseReference(
+                        status_code=201,
+                        description="새 dataset grant가 생성되면 grant record를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="id", type="string", description="dataset grant UUID입니다."),
+                            ApiFieldReference(name="dataset_key", type="string", description="grant가 적용되는 dataset key입니다."),
+                            ApiFieldReference(name="grant_axis", type="string", description="grant 평가 축입니다."),
+                            ApiFieldReference(name="subject_key", type="string", description="허용된 subject key입니다."),
+                            ApiFieldReference(name="granted_by", type="string | null", description="grant 생성 actor입니다.", required=False),
+                            ApiFieldReference(name="created_at", type="string", description="grant 생성 시각입니다."),
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=200,
+                        description="동일한 grant가 이미 존재하면 기존 record를 그대로 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="id", type="string", description="dataset grant UUID입니다."),
+                            ApiFieldReference(name="dataset_key", type="string", description="grant가 적용되는 dataset key입니다."),
+                            ApiFieldReference(name="grant_axis", type="string", description="grant 평가 축입니다."),
+                            ApiFieldReference(name="subject_key", type="string", description="허용된 subject key입니다."),
+                            ApiFieldReference(name="granted_by", type="string | null", description="원래 grant 생성 actor입니다.", required=False),
+                            ApiFieldReference(name="created_at", type="string", description="grant 생성 시각입니다."),
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=400,
+                        description="dataset key가 manifest registry에 없으면 bad request를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패 필드입니다.", example="dataset_key"),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 원인 설명입니다."),
+                        ],
+                        example={
+                            "detail": {
+                                "field": "dataset_key",
+                                "message": "Unknown dataset 'missing_dataset'.",
+                            }
+                        },
+                    ),
+                ],
+                openapi_href="/docs#/identity/upsert_dataset_grant_api_v1_identity_dataset_grants_put",
+            ),
+            ApiEndpointReference(
+                id="identity-dataset-grants-delete",
+                method="DELETE",
+                path=f"{api_prefix}/identity/dataset-grants/{{grant_id}}",
+                summary="Delete dataset grant",
+                description="dataset grant UUID를 기준으로 기존 dataset visibility grant를 삭제합니다.",
+                parameters=[
+                    ApiFieldReference(name="grant_id", type="path string", description="삭제할 dataset grant UUID입니다."),
+                ],
+                responses=[
+                    ApiResponseReference(
+                        status_code=204,
+                        description="dataset grant가 삭제되면 본문 없이 성공을 반환합니다.",
+                        fields=[],
+                    ),
+                    ApiResponseReference(
+                        status_code=404,
+                        description="해당 UUID의 dataset grant가 없으면 not found를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패 필드입니다.", example="grant_id"),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 원인 설명입니다."),
+                        ],
+                        example={
+                            "detail": {
+                                "field": "grant_id",
+                                "message": "Dataset grant '00000000-0000-0000-0000-000000000000' was not found.",
+                            }
+                        },
+                    ),
+                ],
+                openapi_href="/docs#/identity/delete_dataset_grant_api_v1_identity_dataset_grants__grant_id__delete",
+            ),
+            ApiEndpointReference(
                 id="metadata-bootstrap",
                 method="GET",
                 path=f"{api_prefix}/metadata/bootstrap",
@@ -266,6 +386,20 @@ async def get_api_reference() -> ApiReferenceResponse:
                             ApiFieldReference(name="document", type="object", description="현재 선택된 dashboard document입니다."),
                             *dashboard_version_fields,
                         ],
+                    ),
+                    ApiResponseReference(
+                        status_code=400,
+                        description="dashboard document의 placement 참조, panel query, 또는 panel result contract가 현재 dashboard/schema contract와 맞지 않으면 bad request를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패가 발생한 document 경로입니다.", example="document.panelLibrary[0].query.datasetKey"),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 원인 설명입니다."),
+                        ],
+                        example={
+                            "detail": {
+                                "field": "document.panelLibrary[0].query.datasetKey",
+                                "message": "Unknown dataset 'missing_dataset'.",
+                            }
+                        },
                     ),
                     ApiResponseReference(
                         status_code=409,
@@ -339,6 +473,20 @@ async def get_api_reference() -> ApiReferenceResponse:
                             *dashboard_version_fields,
                         ],
                     ),
+                    ApiResponseReference(
+                        status_code=400,
+                        description="dashboard document의 placement 참조, panel query, 또는 panel result contract가 현재 dashboard/schema contract와 맞지 않으면 bad request를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패가 발생한 document 경로입니다.", example="document.panelLibrary[0].scorecard.valueField"),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 원인 설명입니다."),
+                        ],
+                        example={
+                            "detail": {
+                                "field": "document.panelLibrary[0].scorecard.valueField",
+                                "message": "Scorecard value field 'profit' is not returned by the panel query.",
+                            }
+                        },
+                    ),
                 ],
                 openapi_href="/docs#/dashboards/update_dashboard_api_v1_dashboards__slug__put",
             ),
@@ -403,12 +551,18 @@ async def get_api_reference() -> ApiReferenceResponse:
                 method="GET",
                 path=f"{api_prefix}/query/bootstrap",
                 summary="Governed query bootstrap",
-                description="Dataset manifest registry와 governed-query rule set을 내려주는 bootstrap endpoint입니다.",
-                parameters=[],
+                description="현재 요청 principal에 허용된 dataset manifest registry와 governed-query rule set을 내려주는 bootstrap endpoint입니다. grant가 맞지 않는 dataset은 목록에서 숨깁니다.",
+                parameters=[
+                    ApiFieldReference(name="X-FLooks-User", type="header string", description="dataset grant 평가에 사용할 user subject key입니다.", required=False, example="owner-1"),
+                    ApiFieldReference(name="X-FLooks-Teams", type="header string", description="dataset grant 평가에 사용할 team subject key 목록입니다. 여러 팀은 쉼표로 구분합니다.", required=False, example="growth,operations"),
+                    ApiFieldReference(name="X-FLooks-Department", type="header string", description="dataset grant 평가에 사용할 department subject key입니다.", required=False, example="commerce"),
+                    ApiFieldReference(name="X-FLooks-Role", type="header string", description="dataset grant 평가에 사용할 role subject key입니다.", required=False, example="analyst"),
+                    ApiFieldReference(name="X-FLooks-Workspace", type="header string", description="dataset grant 평가에 사용할 workspace subject key입니다.", required=False, example="primary"),
+                ],
                 responses=[
                     ApiResponseReference(
                         status_code=200,
-                        description="manifest registry와 query rule set을 반환합니다.",
+                        description="현재 principal에 접근이 허용된 manifest registry와 query rule set을 반환합니다.",
                         fields=[
                             ApiFieldReference(name="datasets[].key", type="string", description="dataset의 안정적인 식별자입니다."),
                             ApiFieldReference(name="datasets[].label", type="string", description="표시용 dataset 이름입니다."),
@@ -444,8 +598,13 @@ async def get_api_reference() -> ApiReferenceResponse:
                 method="POST",
                 path=f"{api_prefix}/query/validate",
                 summary="Validate QuerySpec",
-                description="QuerySpec payload를 dataset manifest에 대조해 semantic validation, default filter 병합, row limit 보정을 수행합니다.",
+                description="QuerySpec payload를 현재 principal에 허용된 dataset manifest에 대조해 semantic validation, default filter 병합, row limit 보정을 수행합니다. 접근 권한이 없는 dataset은 존재를 숨기기 위해 unknown dataset처럼 처리합니다.",
                 parameters=[
+                    ApiFieldReference(name="X-FLooks-User", type="header string", description="dataset grant 평가에 사용할 user subject key입니다.", required=False, example="owner-1"),
+                    ApiFieldReference(name="X-FLooks-Teams", type="header string", description="dataset grant 평가에 사용할 team subject key 목록입니다. 여러 팀은 쉼표로 구분합니다.", required=False, example="growth,operations"),
+                    ApiFieldReference(name="X-FLooks-Department", type="header string", description="dataset grant 평가에 사용할 department subject key입니다.", required=False, example="commerce"),
+                    ApiFieldReference(name="X-FLooks-Role", type="header string", description="dataset grant 평가에 사용할 role subject key입니다.", required=False, example="analyst"),
+                    ApiFieldReference(name="X-FLooks-Workspace", type="header string", description="dataset grant 평가에 사용할 workspace subject key입니다.", required=False, example="primary"),
                     ApiFieldReference(name="datasetKey", type="string", description="검증 대상 dataset manifest key입니다.", example="mart_commerce_daily"),
                     ApiFieldReference(name="dimensions[]", type="string[]", description="group-by에 사용할 dimension key 목록입니다.", required=False, example=["order_date", "channel_name"]),
                     ApiFieldReference(name="metrics[].key", type="string", description="선택할 metric key입니다.", example="revenue"),
@@ -481,7 +640,7 @@ async def get_api_reference() -> ApiReferenceResponse:
                     ),
                     ApiResponseReference(
                         status_code=400,
-                        description="payload가 manifest 규칙을 위반하면 detail 필드에 실패 이유를 반환합니다.",
+                        description="payload가 manifest 규칙을 위반하거나 현재 principal에 dataset 접근 권한이 없으면 detail 필드에 실패 이유를 반환합니다. 권한 부족은 unknown dataset처럼 숨겨집니다.",
                         fields=[
                             ApiFieldReference(name="detail.field", type="string", description="실패가 발생한 payload 영역입니다.", example="metrics"),
                             ApiFieldReference(name="detail.message", type="string", description="실패 원인 설명입니다."),
@@ -501,8 +660,13 @@ async def get_api_reference() -> ApiReferenceResponse:
                 method="POST",
                 path=f"{api_prefix}/query/execute",
                 summary="Execute QuerySpec",
-                description="QuerySpec payload를 검증한 후 SQL로 변환하여 실제 database connector(현재 POSTGRES)에서 실행하고 결과를 반환합니다.",
+                description="QuerySpec payload를 현재 principal에 허용된 dataset manifest로 검증한 후 SQL로 변환하여 실제 database connector(현재 POSTGRES)에서 실행하고 결과를 반환합니다. 접근 권한이 없는 dataset은 존재를 숨기기 위해 unknown dataset처럼 처리합니다.",
                 parameters=[
+                    ApiFieldReference(name="X-FLooks-User", type="header string", description="dataset grant 평가에 사용할 user subject key입니다.", required=False, example="owner-1"),
+                    ApiFieldReference(name="X-FLooks-Teams", type="header string", description="dataset grant 평가에 사용할 team subject key 목록입니다. 여러 팀은 쉼표로 구분합니다.", required=False, example="growth,operations"),
+                    ApiFieldReference(name="X-FLooks-Department", type="header string", description="dataset grant 평가에 사용할 department subject key입니다.", required=False, example="commerce"),
+                    ApiFieldReference(name="X-FLooks-Role", type="header string", description="dataset grant 평가에 사용할 role subject key입니다.", required=False, example="analyst"),
+                    ApiFieldReference(name="X-FLooks-Workspace", type="header string", description="dataset grant 평가에 사용할 workspace subject key입니다.", required=False, example="primary"),
                     ApiFieldReference(name="datasetKey", type="string", description="실행 대상 dataset manifest key입니다.", example="mart_commerce_daily"),
                     ApiFieldReference(name="dimensions[]", type="string[]", description="그룹화할 dimension key 목록입니다.", required=False, example=["order_date"]),
                     ApiFieldReference(name="metrics[].key", type="string", description="집계할 metric key입니다.", example="revenue"),
@@ -518,6 +682,30 @@ async def get_api_reference() -> ApiReferenceResponse:
                             ApiFieldReference(name="rowCount", type="integer", description="반환된 총 row 수입니다."),
                             ApiFieldReference(name="executionMetadata.durationMs", type="integer", description="쿼리 실행에 소요된 시간(ms)입니다."),
                             ApiFieldReference(name="executionMetadata.connector", type="string", description="사용된 connector 종류입니다."),
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=400,
+                        description="payload가 manifest 규칙을 위반하거나 현재 principal에 dataset 접근 권한이 없으면 detail 필드에 실패 이유를 반환합니다. 권한 부족은 unknown dataset처럼 숨겨집니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패가 발생한 payload 영역입니다.", example="metrics"),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 원인 설명입니다."),
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=501,
+                        description="요청한 dataset이 아직 지원되지 않는 connector를 가리키면 not implemented를 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패가 발생한 payload 영역입니다.", example="datasetKey"),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 원인 설명입니다."),
+                        ],
+                    ),
+                    ApiResponseReference(
+                        status_code=503,
+                        description="analytics database가 비어 있거나 연결할 수 없으면 service unavailable을 반환합니다.",
+                        fields=[
+                            ApiFieldReference(name="detail.field", type="string", description="실패가 발생한 payload 또는 runtime 설정 영역입니다.", example="analyticsDatabaseUrl"),
+                            ApiFieldReference(name="detail.message", type="string", description="실패 원인 설명입니다."),
                         ],
                     ),
                 ],

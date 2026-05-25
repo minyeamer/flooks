@@ -118,6 +118,12 @@ h1 {
   box-shadow: 0 14px 28px rgba(24, 34, 45, 0.08);
 }
 
+.heroActionActive {
+  border-color: rgba(15, 118, 110, 0.24);
+  background: rgba(15, 118, 110, 0.14);
+  color: var(--accent);
+}
+
 .heroActionPrimary {
   border-color: rgba(15, 118, 110, 0.2);
   background: rgba(15, 118, 110, 0.12);
@@ -519,6 +525,74 @@ h1 {
   align-items: center;
 }
 
+.datasetGrantLayout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.datasetGrantFormMeta {
+  display: grid;
+  gap: 10px;
+}
+
+.datasetGrantImpactSummary {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.datasetGrantImpactSummary strong {
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.datasetGrantSectionHeader,
+.datasetGrantCardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 16px;
+  align-items: flex-start;
+}
+
+.datasetGrantSectionHeader {
+  margin: 18px 0 12px;
+}
+
+.datasetGrantSectionHeader h3,
+.datasetGrantCardHeader strong {
+  font-size: 0.98rem;
+}
+
+.datasetGrantList,
+.datasetGrantDatasetList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.datasetGrantCard,
+.datasetGrantDatasetCard {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 14px 24px rgba(24, 34, 45, 0.06);
+}
+
+.datasetGrantCard p,
+.datasetGrantDatasetCard p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
 .dashboardDeleteWarning {
   display: grid;
   gap: 8px;
@@ -689,15 +763,57 @@ h1 {
   height: 100%;
 }
 
+.runtimeCanvasEditor {
+  background-color: rgba(241, 250, 249, 0.96);
+}
+
+.runtimeCanvasItemEditor {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.runtimeCanvasItemDragging {
+  cursor: grabbing;
+  transform: translateY(-2px);
+}
+
+.runtimeCanvasItemResizing {
+  cursor: nwse-resize;
+}
+
 .runtimeStat,
 .runtimeTableCard,
 .runtimeChartCard,
 .runtimeNoticeCard,
 .runtimeFallbackCard {
+  position: relative;
   border-radius: 18px;
   border: 1px solid rgba(24, 34, 45, 0.08);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 14px 24px rgba(24, 34, 45, 0.08);
+}
+
+.runtimeEditorResizeHandle {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background:
+    linear-gradient(135deg, transparent 0 42%, rgba(15, 118, 110, 0.85) 42% 58%, transparent 58%),
+    linear-gradient(135deg, transparent 0 62%, rgba(15, 118, 110, 0.55) 62% 78%, transparent 78%);
+  cursor: nwse-resize;
+  opacity: 0.72;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.runtimeEditorResizeHandle:hover {
+  opacity: 1;
+  transform: scale(1.04);
 }
 
 .runtimeStat {
@@ -1067,6 +1183,9 @@ h1 {
 }
 
 .runtimeControl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px 14px;
   border: 1px solid rgba(24, 34, 45, 0.08);
   border-radius: 999px;
@@ -1075,6 +1194,7 @@ h1 {
   font: inherit;
   font-size: 0.84rem;
   font-weight: 700;
+  text-decoration: none;
   cursor: pointer;
   transition:
     transform 140ms ease,

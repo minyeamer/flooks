@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from datetime import datetime
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import SystemRole
 
@@ -70,3 +72,48 @@ class PermissionPolicy(BaseModel):
 class IdentityBootstrapResponse(BaseModel):
     identity: IdentityPolicy
     permissions: PermissionPolicy
+
+
+class DatasetGrantEntry(BaseModel):
+    id: UUID
+    dataset_key: str
+    grant_axis: DatasetGrantAxis
+    subject_key: str
+    granted_by: str | None
+    created_at: datetime
+
+
+class DatasetUsagePanelEntry(BaseModel):
+    dashboard_slug: str
+    dashboard_title: str
+    panel_id: str
+    panel_title: str
+    panel_kind: str
+
+
+class DatasetUsageSummary(BaseModel):
+    dashboard_count: int
+    panel_count: int
+    sample_panels: list[DatasetUsagePanelEntry]
+
+
+class DatasetGrantCatalogEntry(BaseModel):
+    key: str
+    label: str
+    description: str
+    grant_axes: list[DatasetGrantAxis]
+    usage_summary: DatasetUsageSummary
+
+
+class DatasetGrantListResponse(BaseModel):
+    catalog_datasets: list[DatasetGrantCatalogEntry]
+    grants: list[DatasetGrantEntry]
+
+
+class DatasetGrantUpsertRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    dataset_key: str = Field(min_length=1)
+    grant_axis: DatasetGrantAxis
+    subject_key: str = Field(min_length=1)
+    granted_by: str | None = Field(default=None, min_length=1)

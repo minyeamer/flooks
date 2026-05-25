@@ -14,6 +14,7 @@ from app.domain.dashboard import (
     STARTER_DASHBOARD_SLUG,
     DashboardCreateRequest,
     DashboardDocument,
+    DashboardPanelRef,
     DashboardResponse,
     DashboardSummary,
     DashboardUpdateRequest,
@@ -21,6 +22,8 @@ from app.domain.dashboard import (
     build_starter_dashboard_document,
 )
 from app.domain.persistence import DashboardVersionStatus, PrincipalKind
+from app.domain.query import QuerySpec
+from app.query.validator import QuerySpecValidationError, validate_query_spec
 
 router = APIRouter(tags=["dashboards"])
 _SEEDED_DASHBOARD_BINDS: WeakSet[object] = WeakSet()
@@ -61,6 +64,7 @@ async def create_dashboard(
 ) -> DashboardResponse:
     _mark_dashboard_store_initialized(session)
     _ensure_document_key_matches_slug(request.slug, request.document.key)
+    _validate_dashboard_document_contract(request.document)
 
     existing_record = session.scalar(select(DashboardRecord.id).where(DashboardRecord.slug == request.slug))
     if existing_record is not None:
@@ -143,6 +147,7 @@ async def update_dashboard(
 ) -> DashboardResponse:
     _mark_dashboard_store_initialized(session)
     _ensure_document_key_matches_slug(slug, request.document.key)
+    _validate_dashboard_document_contract(request.document)
 
     dashboard_record = _get_dashboard_record(session, slug)
     current_version_record = _get_version_record(dashboard_record, None)
@@ -262,6 +267,7 @@ def _to_dashboard_summary(dashboard_record: DashboardRecord) -> DashboardSummary
         owner_principal_key=dashboard_record.owner_principal_key,
         latest_version_number=dashboard_record.latest_version_number,
         latest_version_status=latest_version.status,
+        latest_version_summary=latest_version.summary,
         published_version_count=len(published_versions),
         latest_published_version_number=
         published_versions[-1].version_number if published_versions else None,
@@ -296,6 +302,87 @@ def _ensure_document_key_matches_slug(slug: str, document_key: str) -> None:
                 "message": f"Dashboard document key '{document_key}' must match slug '{slug}'.",
             },
         )
+
+
+def _validate_dashboard_document_contract(document: DashboardDocument) -> None:
+    panel_ids = {panel.id for panel in document.panel_library}
+
+    for page_index, page in enumerate(document.pages):
+        for placement_index, placement in enumerate(page.placements):
+            if placement.panel_id in panel_ids:
+                continue
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "field": f"document.pages[{page_index}].placements[{placement_index}].panelId",
+                    "message": (
+                        f"Placement panelId '{placement.panel_id}' does not match any panel in the panel library."
+                    ),
+                },
+            )
+
+    for panel_index, panel in enumerate(document.panel_library):
+        if panel.query is None:
+            continue
+
+        if panel.dataset_key != panel.query.dataset_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "field": f"document.panelLibrary[{panel_index}].datasetKey",
+                    "message": (
+                        f"Panel datasetKey '{panel.dataset_key}' must match query datasetKey "
+                        f"'{panel.query.dataset_key}'."
+                    ),
+                },
+            )
+
+        try:
+            validation = validate_query_spec(QuerySpec.model_validate(panel.query.model_dump()))
+        except QuerySpecValidationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "field": f"document.panelLibrary[{panel_index}].query.{error.field}",
+                    "message": error.message,
+                },
+            ) from error
+
+        _validate_panel_result_contract(panel_index, panel)
+
+
+def _validate_panel_result_contract(panel_index: int, panel: DashboardPanelRef) -> None:
+    if panel.query is None:
+        return
+
+    selected_result_fields = {
+        *panel.query.dimensions,
+        *(metric.key for metric in panel.query.metrics),
+    }
+
+    if panel.scorecard is not None and panel.scorecard.value_field not in selected_result_fields:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "field": f"document.panelLibrary[{panel_index}].scorecard.valueField",
+                "message": (
+                    f"Scorecard value field '{panel.scorecard.value_field}' is not returned by the panel query."
+                ),
+            },
+        )
+
+    if panel.table is not None:
+        invalid_columns = [column for column in panel.table.columns if column not in selected_result_fields]
+        if invalid_columns:
+            invalid_columns_label = ", ".join(f"'{column}'" for column in invalid_columns)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "field": f"document.panelLibrary[{panel_index}].table.columns",
+                    "message": f"Table columns {invalid_columns_label} are not returned by the panel query.",
+                },
+            )
 
 
 def _ensure_starter_dashboard_seeded(session: Session, slug: str | None = None) -> None:

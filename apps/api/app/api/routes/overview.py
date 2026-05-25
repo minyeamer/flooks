@@ -58,8 +58,8 @@ async def get_overview() -> OverviewResponse:
         headline="FLooks web shell is live",
         summary=(
             "The web shell now exposes live runtime status, starter dashboard operations, "
-            "structured API reference data, dashboard CRUD/versioning, and governed query "
-            "validation/execution on top of the running backend surfaces."
+            "structured API reference data, dashboard CRUD/versioning, dataset grant management, "
+            "and governed query validation/execution on top of the running backend surfaces."
         ),
         metrics=[
             OverviewMetric(
@@ -89,8 +89,8 @@ async def get_overview() -> OverviewResponse:
             ),
             OverviewMetric(
                 label="Live endpoints",
-                value="16",
-                note="Health, system, identity bootstrap, metadata bootstrap, query bootstrap, query validation, query execution, dashboard list/create/detail/starter refresh/update/delete, overview, API reference, and OpenAPI docs are now runnable surfaces.",
+                value="19",
+                note="Health, system, identity bootstrap, dataset grant list/upsert/delete, metadata bootstrap, query bootstrap, query validation, query execution, dashboard list/create/detail/starter refresh/update/delete, overview, API reference, and OpenAPI docs are now runnable surfaces.",
             ),
         ],
         execution_plan=[
@@ -152,6 +152,11 @@ async def get_overview() -> OverviewResponse:
                 label="Identity Bootstrap",
                 href=f"{api_prefix}/identity/bootstrap",
                 description="Identity, approval, and permission policy baseline for future auth flows.",
+            ),
+            ServiceLink(
+                label="Dataset Grants",
+                href=f"{api_prefix}/identity/dataset-grants",
+                description="Manage dataset visibility grants that control which governed-query datasets each principal context can discover and execute.",
             ),
             ServiceLink(
                 label="Metadata Bootstrap",

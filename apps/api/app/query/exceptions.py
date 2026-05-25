@@ -13,3 +13,12 @@ class UnsupportedQueryConnectorError(ValueError):
         super().__init__(
             f"Connector '{connector_kind}' is not supported by the current query execution path."
         )
+
+
+class QueryExecutionError(RuntimeError):
+    """Raised when a connector cannot execute a governed query safely."""
+
+    def __init__(self, field: str, message: str, status_code: int) -> None:
+        self.field = field
+        self.status_code = status_code
+        super().__init__(message)
