@@ -602,6 +602,24 @@ h1 {
   margin: 0;
 }
 
+.runtimeStarterHistoryLabels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.runtimeStarterHistoryTag {
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background: rgba(24, 34, 45, 0.05);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .runtimeControlGroup {
   display: inline-flex;
   flex-wrap: wrap;

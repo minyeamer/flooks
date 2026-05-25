@@ -152,6 +152,7 @@ type StarterRefreshHistoryEntry = {
   detail: string;
   timestampLabel: string;
   tone: StarterRefreshHistoryTone;
+  contextLabels: string[];
 };
 
 type RuntimeCanvasScaleMode = 'fit' | 'detail';
@@ -241,7 +242,24 @@ function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
           typeof entry.timestampLabel === 'string' &&
           (entry.tone === 'success' || entry.tone === 'error')
         ) {
-          return [entry satisfies StarterRefreshHistoryEntry];
+          const rawContextLabels =
+            'contextLabels' in entry && Array.isArray(entry.contextLabels)
+              ? (entry.contextLabels as unknown[])
+              : [];
+          const contextLabels = rawContextLabels
+            .filter((label): label is string => typeof label === 'string')
+            .slice(0, 3);
+
+          return [
+            {
+              id: entry.id,
+              summary: entry.summary,
+              detail: entry.detail,
+              timestampLabel: entry.timestampLabel,
+              tone: entry.tone,
+              contextLabels,
+            } satisfies StarterRefreshHistoryEntry,
+          ];
         }
 
         return [];
@@ -250,6 +268,28 @@ function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
   } catch {
     return [];
   }
+}
+
+function buildStarterRefreshHistoryContextLabels(options: {
+  versionNumber?: number | null;
+  versionStatus?: string | null;
+  ownerPrincipalKey?: string | null;
+}): string[] {
+  const contextLabels: string[] = [];
+
+  if (options.versionNumber != null) {
+    contextLabels.push(`v${options.versionNumber}`);
+  }
+
+  if (options.versionStatus != null) {
+    contextLabels.push(options.versionStatus);
+  }
+
+  if (options.ownerPrincipalKey != null) {
+    contextLabels.push(`Owner ${options.ownerPrincipalKey}`);
+  }
+
+  return contextLabels.slice(0, 3);
 }
 
 function persistStarterRefreshHistory(history: StarterRefreshHistoryEntry[]): void {
@@ -761,6 +801,7 @@ function App() {
     summary: string,
     detail: string,
     tone: StarterRefreshHistoryTone,
+    contextLabels: string[] = [],
   ): void {
     const timestampLabel = dateTimeFormatter.format(new Date());
 
@@ -771,6 +812,7 @@ function App() {
         detail,
         timestampLabel,
         tone,
+        contextLabels: contextLabels.slice(0, 3),
       },
       ...currentHistory,
     ].slice(0, 4));
@@ -902,7 +944,16 @@ function App() {
             ? 'refreshed'
             : 'aligned',
       );
-      recordStarterRefreshHistory(historySummary, historyDetail, 'success');
+      recordStarterRefreshHistory(
+        historySummary,
+        historyDetail,
+        'success',
+        buildStarterRefreshHistoryContextLabels({
+          versionNumber: payload.latestVersionNumber,
+          versionStatus: payload.latestVersionStatus,
+          ownerPrincipalKey: payload.ownerPrincipalKey,
+        }),
+      );
       setDashboardNoticeTone('success');
     } catch (error) {
       setStarterRefreshOutcome(null);
@@ -912,6 +963,11 @@ function App() {
           ? error.message
           : `Unable to refresh starter dashboard '${starterDashboard.key}'.`,
         'error',
+        buildStarterRefreshHistoryContextLabels({
+          versionNumber: persistedDashboardVersion,
+          versionStatus: persistedDashboardVersionStatus,
+          ownerPrincipalKey: dashboardOwnerPrincipalKey,
+        }),
       );
       setDashboardNotice(
         error instanceof Error
@@ -1532,6 +1588,15 @@ function App() {
                           <span>{entry.timestampLabel}</span>
                         </div>
                         <p>{entry.detail}</p>
+                        {entry.contextLabels.length > 0 ? (
+                          <div className="runtimeStarterHistoryLabels" aria-label="Starter action context">
+                            {entry.contextLabels.map((label) => (
+                              <span className="runtimeStarterHistoryTag" key={`${entry.id}-${label}`}>
+                                {label}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </article>
                     ))}
                   </div>
