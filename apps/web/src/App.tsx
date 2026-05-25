@@ -213,6 +213,7 @@ const clearStarterHistoryConfirmTimeoutMs = 4000;
 const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f'] as const;
 const starterDashboardBootstrapOwnerKey = 'system-bootstrap';
 const starterRefreshHistoryStorageKey = 'flooks.starter-refresh-history';
+const starterRefreshHistoryFilterStorageKey = 'flooks.starter-refresh-history-filter';
 
 function inferStarterRefreshHistoryKind(
   summary: string,
@@ -273,6 +274,30 @@ function getStarterRefreshHistoryFilterLabel(filter: StarterRefreshHistoryFilter
   }
 
   return getStarterRefreshHistoryKindLabel(filter) ?? 'All';
+}
+
+function loadStarterRefreshHistoryFilter(): StarterRefreshHistoryFilter {
+  if (typeof window === 'undefined') {
+    return 'all';
+  }
+
+  try {
+    const savedFilter = window.sessionStorage.getItem(starterRefreshHistoryFilterStorageKey);
+
+    if (
+      savedFilter === 'all' ||
+      savedFilter === 'created' ||
+      savedFilter === 'refreshed' ||
+      savedFilter === 'aligned' ||
+      savedFilter === 'failed'
+    ) {
+      return savedFilter;
+    }
+  } catch {
+    return 'all';
+  }
+
+  return 'all';
 }
 
 function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
@@ -393,6 +418,23 @@ function persistStarterRefreshHistory(history: StarterRefreshHistoryEntry[]): vo
     }
 
     window.sessionStorage.setItem(starterRefreshHistoryStorageKey, JSON.stringify(history));
+  } catch {
+    return;
+  }
+}
+
+function persistStarterRefreshHistoryFilter(filter: StarterRefreshHistoryFilter): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (filter === 'all') {
+      window.sessionStorage.removeItem(starterRefreshHistoryFilterStorageKey);
+      return;
+    }
+
+    window.sessionStorage.setItem(starterRefreshHistoryFilterStorageKey, filter);
   } catch {
     return;
   }
@@ -853,7 +895,7 @@ function App() {
     loadStarterRefreshHistory(),
   );
   const [starterRefreshHistoryFilter, setStarterRefreshHistoryFilter] =
-    useState<StarterRefreshHistoryFilter>('all');
+    useState<StarterRefreshHistoryFilter>(() => loadStarterRefreshHistoryFilter());
   const [isClearStarterHistoryArmed, setIsClearStarterHistoryArmed] = useState<boolean>(false);
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
@@ -1187,6 +1229,10 @@ function App() {
   useEffect(() => {
     persistStarterRefreshHistory(starterRefreshHistory);
   }, [starterRefreshHistory]);
+
+  useEffect(() => {
+    persistStarterRefreshHistoryFilter(starterRefreshHistoryFilter);
+  }, [starterRefreshHistoryFilter]);
 
   useEffect(() => {
     if (!isClearStarterHistoryArmed) {
