@@ -239,32 +239,57 @@ function formatScorecardValue(
   return `${valuePrefix ?? ''}${formattedValue}${valueSuffix ?? ''}`;
 }
 
-function getDashboardRuntimePanels(dashboardDocument: DashboardDocument): PanelRef[] {
-  const firstPage = dashboardDocument.pages[0];
+function getDefaultDashboardPageId(dashboardDocument: DashboardDocument): string | null {
+  return dashboardDocument.pages[0]?.id ?? null;
+}
 
-  if (firstPage == null) {
+function getActiveDashboardPage(dashboardDocument: DashboardDocument, pageId: string | null) {
+  if (pageId != null) {
+    const selectedPage = dashboardDocument.pages.find((page) => page.id === pageId);
+
+    if (selectedPage != null) {
+      return selectedPage;
+    }
+  }
+
+  return dashboardDocument.pages[0] ?? null;
+}
+
+function getDashboardRuntimePanels(
+  dashboardDocument: DashboardDocument,
+  pageId: string | null,
+): PanelRef[] {
+  const activePage = getActiveDashboardPage(dashboardDocument, pageId);
+
+  if (activePage == null) {
     return [];
   }
 
   const panelsById = new Map(dashboardDocument.panelLibrary.map((panel) => [panel.id, panel]));
 
-  return firstPage.placements
+  return activePage.placements
     .map((placement) => panelsById.get(placement.panelId))
     .filter((panel): panel is PanelRef => panel != null);
 }
 
-function buildInitialPanelRuntime(dashboardDocument: DashboardDocument): Record<string, PanelRuntimeEntry> {
-  return getDashboardRuntimePanels(dashboardDocument).reduce<Record<string, PanelRuntimeEntry>>((state, panel) => {
-    if (panel.query != null) {
-      state[panel.id] = {
-        state: 'loading',
-        data: null,
-        errorMessage: null,
-      };
-    }
+function buildInitialPanelRuntime(
+  dashboardDocument: DashboardDocument,
+  pageId: string | null,
+): Record<string, PanelRuntimeEntry> {
+  return getDashboardRuntimePanels(dashboardDocument, pageId).reduce<Record<string, PanelRuntimeEntry>>(
+    (state, panel) => {
+      if (panel.query != null) {
+        state[panel.id] = {
+          state: 'loading',
+          data: null,
+          errorMessage: null,
+        };
+      }
 
-    return state;
-  }, {});
+      return state;
+    },
+    {},
+  );
 }
 
 async function getResponseMessage(response: Response, fallback: string): Promise<string> {
@@ -292,10 +317,13 @@ function App() {
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [apiReference, setApiReference] = useState<ApiReferenceResponse | null>(null);
   const [dashboardDocument, setDashboardDocument] = useState<DashboardDocument>(starterDashboard);
+  const [activePageId, setActivePageId] = useState<string | null>(() =>
+    getDefaultDashboardPageId(starterDashboard),
+  );
   const [dashboardSourceLabel, setDashboardSourceLabel] = useState<string>('Starter seed');
   const [dashboardNotice, setDashboardNotice] = useState<string | null>(null);
   const [panelRuntime, setPanelRuntime] = useState<Record<string, PanelRuntimeEntry>>(() =>
-    buildInitialPanelRuntime(starterDashboard),
+    buildInitialPanelRuntime(starterDashboard, getDefaultDashboardPageId(starterDashboard)),
   );
   const [requestState, setRequestState] = useState<RequestState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -415,12 +443,25 @@ function App() {
   }, []);
 
   useEffect(() => {
+    setActivePageId((currentPageId) => {
+      if (
+        currentPageId != null &&
+        dashboardDocument.pages.some((page) => page.id === currentPageId)
+      ) {
+        return currentPageId;
+      }
+
+      return getDefaultDashboardPageId(dashboardDocument);
+    });
+  }, [dashboardDocument]);
+
+  useEffect(() => {
     const controller = new AbortController();
 
     async function loadDashboardRuntimePanels() {
-      const runtimePanels = getDashboardRuntimePanels(dashboardDocument);
+      const runtimePanels = getDashboardRuntimePanels(dashboardDocument, activePageId);
 
-      setPanelRuntime(buildInitialPanelRuntime(dashboardDocument));
+      setPanelRuntime(buildInitialPanelRuntime(dashboardDocument, activePageId));
 
       for (const panel of runtimePanels) {
         if (panel.query == null) {
@@ -485,12 +526,13 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [dashboardDocument]);
+  }, [activePageId, dashboardDocument]);
 
   const liveRoles = system?.roles ?? systemRoles;
   const liveDataSources = system?.dataSources ?? dataSourceKinds;
   const liveModules = system?.modules ?? [];
-  const dashboardRuntimePanels = getDashboardRuntimePanels(dashboardDocument);
+  const activeDashboardPage = getActiveDashboardPage(dashboardDocument, activePageId);
+  const dashboardRuntimePanels = getDashboardRuntimePanels(dashboardDocument, activePageId);
   const dashboardScorecardPanels = dashboardRuntimePanels.filter(isScorecardPanel);
   const dashboardTablePanel = dashboardRuntimePanels.find(isTablePanel) ?? null;
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
@@ -774,14 +816,36 @@ function App() {
         <section className="panel panelWide">
           <div className="panelHeader">
             <span className="chip">Live Panel Runtime</span>
-            <h2>Starter dashboard panel preview</h2>
+            <h2>Active dashboard page preview</h2>
             <p className="sectionSummary">
-              The web shell now reads first-party panel definitions from the starter dashboard document
-              and executes each scorecard/table panel through the live query execution API.
+              The web shell reads first-party panel definitions from the active dashboard page and
+              executes each scorecard or table panel through the live query execution API.
             </p>
-            <p className="runtimeMeta">{dashboardSourceLabel} · {dashboardDocument.key}</p>
+            <div className="runtimeToolbar">
+              <p className="runtimeMeta">{dashboardSourceLabel} · {dashboardDocument.key}</p>
+              {activeDashboardPage ? (
+                <p className="runtimeMeta">
+                  Active page: {activeDashboardPage.title} · {activeDashboardPage.placements.length}{' '}
+                  placements
+                </p>
+              ) : null}
+            </div>
           </div>
           {dashboardNotice ? <p className="callout">{dashboardNotice}</p> : null}
+          {dashboardDocument.pages.length > 1 ? (
+            <div className="pageSelector" aria-label="Dashboard pages">
+              {dashboardDocument.pages.map((page) => (
+                <button
+                  type="button"
+                  className={`pageTab${page.id === activeDashboardPage?.id ? ' pageTabActive' : ''}`}
+                  key={page.id}
+                  onClick={() => setActivePageId(page.id)}
+                >
+                  {page.title}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="runtimeLayout">
             <div className="runtimeStats">
               {dashboardScorecardPanels.map((panel) => {
@@ -884,14 +948,21 @@ function App() {
           <div className="panelHeader">
             <span className="chip">Dashboard Document</span>
             <h2>Page and library seed data</h2>
-            <p className="runtimeMeta">{dashboardSourceLabel}</p>
+            <p className="runtimeMeta">
+              {dashboardSourceLabel} · {dashboardDocument.pages.length} pages · {dashboardDocument.panelLibrary.length}{' '}
+              library panels
+            </p>
           </div>
           <div className="documentPreview">
             <div>
               <h3>Pages</h3>
               <p>
-                {dashboardDocument.pages[0]?.title} · {dashboardDocument.pages[0]?.width}×
-                {dashboardDocument.pages[0]?.height}px
+                {dashboardDocument.pages
+                  .map(
+                    (page) =>
+                      `${page.title} (${page.width}×${page.height}px, ${page.placements.length} placements)`,
+                  )
+                  .join(' / ')}
               </p>
             </div>
             <div>

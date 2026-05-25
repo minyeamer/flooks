@@ -421,6 +421,49 @@ h1 {
   line-height: 1.6;
 }
 
+.runtimeToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.pageSelector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.pageTab {
+  padding: 10px 14px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.pageTab:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 118, 110, 0.24);
+  box-shadow: 0 14px 24px rgba(24, 34, 45, 0.08);
+}
+
+.pageTabActive {
+  border-color: rgba(15, 118, 110, 0.24);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .runtimeTableCard {
   padding: 18px;
 }
@@ -681,6 +724,11 @@ h1 {
 
   .list.compact {
     columns: 1;
+  }
+
+  .runtimeToolbar {
+    flex-direction: column;
+    gap: 6px;
   }
 
   .referenceSummary {
