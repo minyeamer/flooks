@@ -275,24 +275,6 @@ Functional result:
 Validation:
 - `npm run build:web`
 
-## b424d0d1 · Runtime canvas zoom reset
-
-Intent: make the runtime canvas controls more usable by adding stepwise zoom adjustments and a single action that restores the default fit view.
-
-What changed:
-- `apps/web/src/App.tsx` added a `runtimeCanvasZoomPercent` state and layered it on top of the existing `fit` and `detail` base scale modes.
-- `apps/web/src/App.tsx` updated the runtime canvas sizing helper so zoom changes affect the effective canvas width, preview height, and row sizing without changing the placement-driven layout model.
-- `apps/web/src/App.tsx` also added `-`, `Reset`, and `+` controls to the runtime toolbar and surfaced the current zoom percentage in the canvas header.
-- `apps/web/src/styles.css` added explicit disabled-state styling for the zoom buttons so the controls stay visually consistent at the zoom limits.
-
-Functional result:
-- The runtime preview can now be nudged in smaller zoom steps instead of relying only on the coarse `fit` and `detail` presets.
-- One reset action returns the shell to the default fit view, which makes large-page inspection less sticky after manual zooming.
-- The underlying stored dashboard layout is still unchanged because zoom only affects the preview scale in the shell.
-
-Validation:
-- `npm run build:web`
-
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
@@ -444,6 +426,42 @@ Functional result:
 - The runtime preview can now stay fit to the panel width by default or switch into a larger detail view for closer inspection.
 - Larger dashboard pages can be panned horizontally in detail mode instead of forcing every preview to remain compressed.
 - The stored dashboard layout model remains unchanged because the controls only affect preview scaling in the shell.
+
+Validation:
+- `npm run build:web`
+
+## b424d0d1 · Runtime canvas zoom reset
+
+Intent: make the runtime canvas controls more usable by adding stepwise zoom adjustments and a single action that restores the default fit view.
+
+What changed:
+- `apps/web/src/App.tsx` added a `runtimeCanvasZoomPercent` state and layered it on top of the existing `fit` and `detail` base scale modes.
+- `apps/web/src/App.tsx` updated the runtime canvas sizing helper so zoom changes affect the effective canvas width, preview height, and row sizing without changing the placement-driven layout model.
+- `apps/web/src/App.tsx` also added `-`, `Reset`, and `+` controls to the runtime toolbar and surfaced the current zoom percentage in the canvas header.
+- `apps/web/src/styles.css` added explicit disabled-state styling for the zoom buttons so the controls stay visually consistent at the zoom limits.
+
+Functional result:
+- The runtime preview can now be nudged in smaller zoom steps instead of relying only on the coarse `fit` and `detail` presets.
+- One reset action returns the shell to the default fit view, which makes large-page inspection less sticky after manual zooming.
+- The underlying stored dashboard layout is still unchanged because zoom only affects the preview scale in the shell.
+
+Validation:
+- `npm run build:web`
+
+## 70bdc1f5 · Runtime canvas zoom shortcuts
+
+Intent: make runtime canvas inspection faster by adding direct keyboard and pointer shortcuts on top of the existing zoom controls.
+
+What changed:
+- `apps/web/src/App.tsx` added zoom helper functions that reuse the existing zoom/reset state path instead of introducing a separate shortcut-only code path.
+- `apps/web/src/App.tsx` made the runtime canvas scroller focusable and added keyboard shortcuts for `+`, `-`, and `0` so zoom in, zoom out, and reset are available without clicking the toolbar buttons.
+- `apps/web/src/App.tsx` also added `Alt + wheel` zoom handling on the canvas scroller and surfaced the shortcut hint inside the runtime preview.
+- `apps/web/src/styles.css` added a visible focus ring for the focusable canvas scroller so the keyboard shortcut target is discoverable.
+
+Functional result:
+- The runtime preview can now be inspected faster from the keyboard instead of relying only on the zoom buttons.
+- Large pages can be zoomed with `Alt + wheel` while staying inside the existing runtime canvas surface.
+- Reset behavior remains consistent because the shortcut path reuses the same fit/reset state used by the toolbar controls.
 
 Validation:
 - `npm run build:web`
