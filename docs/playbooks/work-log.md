@@ -769,3 +769,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## e70e0907 · Count failed starter history
+
+Intent: make the recent starter history filter more operational at a glance by showing how many failed starter actions are currently present before the user switches into the failed-only view.
+
+What changed:
+- `apps/web/src/App.tsx` now exposes the current failed-history count directly in the `Failed` filter control.
+- `apps/web/src/App.tsx` also adds an explicit accessibility label so assistive technologies can announce the current failed-entry count along with the filter action.
+- `apps/web/src/styles.css` updates the filter pill layout to support an inline count badge and adds count-badge styling for both idle and active filter states.
+
+Functional result:
+- Operators can now tell whether failure triage is needed without first switching filters.
+- The failed-history count stays visually tied to the filter that uses it, which makes the starter history toolbar easier to scan during repeated refresh attempts.
+- The active failed-only state keeps the count readable without losing the existing filter emphasis.
+
+Validation:
+- `npm run build:web`
