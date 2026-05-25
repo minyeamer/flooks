@@ -219,19 +219,32 @@ function inferStarterRefreshHistoryKind(
     return 'failed';
   }
 
-  if (summary === 'Created starter persistence') {
+  if (summary === 'Created starter persistence' || summary === 'Starter persistence') {
     return 'created';
   }
 
-  if (summary === 'Refreshed starter seed') {
+  if (summary === 'Refreshed starter seed' || summary === 'Starter seed') {
     return 'refreshed';
   }
 
-  if (summary === 'Starter already aligned') {
+  if (summary === 'Starter already aligned' || summary === 'Starter alignment') {
     return 'aligned';
   }
 
   return null;
+}
+
+function getStarterRefreshHistorySummary(actionKind: StarterRefreshHistoryKind): string {
+  switch (actionKind) {
+    case 'created':
+      return 'Starter persistence';
+    case 'refreshed':
+      return 'Starter seed';
+    case 'aligned':
+      return 'Starter alignment';
+    case 'failed':
+      return 'Starter refresh';
+  }
 }
 
 function getStarterRefreshHistoryKindLabel(
@@ -971,18 +984,13 @@ function App() {
       const payload = (await response.json()) as DashboardApiResponse;
 
       applyDashboardPayload(payload);
-      const historySummary =
-        previousPersistedVersion == null
-          ? 'Created starter persistence'
-          : payload.latestVersionNumber > previousPersistedVersion
-            ? 'Refreshed starter seed'
-            : 'Starter already aligned';
       const historyActionKind =
         previousPersistedVersion == null
           ? 'created'
           : payload.latestVersionNumber > previousPersistedVersion
             ? 'refreshed'
             : 'aligned';
+      const historySummary = getStarterRefreshHistorySummary(historyActionKind);
       const historyDetail =
         previousPersistedVersion == null
           ? `Persisted the canonical starter as version ${payload.latestVersionNumber}.`
@@ -1019,7 +1027,7 @@ function App() {
     } catch (error) {
       setStarterRefreshOutcome(null);
       recordStarterRefreshHistory(
-        'Starter refresh failed',
+        getStarterRefreshHistorySummary('failed'),
         error instanceof Error
           ? error.message
           : `Unable to refresh starter dashboard '${starterDashboard.key}'.`,

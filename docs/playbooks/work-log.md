@@ -699,3 +699,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## Same commit · Shorter starter history summaries
+
+Intent: now that action badges already carry the action category, shorten each recent starter history summary into a denser subject line so the trail is faster to scan.
+
+What changed:
+- `apps/web/src/App.tsx` added a small summary helper that derives shorter starter history subject lines from the existing action kind.
+- `apps/web/src/App.tsx` now records compact summaries such as `Starter persistence`, `Starter seed`, `Starter alignment`, and `Starter refresh` instead of repeating the full action phrase in the summary text.
+- `apps/web/src/App.tsx` also keeps backward-compatible action-kind inference for both the older long summaries and the new shorter summaries so existing browser-session history still renders correctly.
+
+Functional result:
+- The recent starter action trail is denser because the badge carries the action category and the summary line now focuses on the affected starter surface.
+- Existing browser-session history continues to load because action-kind inference understands both the earlier summary wording and the shorter wording introduced here.
+- Repeated starter operations are easier to scan without losing the detailed explanation line underneath each entry.
+
+Validation:
+- `npm run build:web`
