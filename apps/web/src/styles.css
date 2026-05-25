@@ -439,6 +439,86 @@ h1 {
   line-height: 1.6;
 }
 
+.dashboardVersionComposer {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background:
+    linear-gradient(180deg, rgba(15, 118, 110, 0.08), rgba(255, 255, 255, 0.88) 58%),
+    rgba(255, 255, 255, 0.84);
+}
+
+.dashboardVersionComposerHeader {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 16px;
+  align-items: baseline;
+}
+
+.dashboardVersionComposerFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboardVersionField {
+  display: grid;
+  gap: 6px;
+}
+
+.dashboardVersionField span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dashboardVersionFieldWide {
+  grid-column: 1 / -1;
+}
+
+.dashboardVersionField input,
+.dashboardVersionField select,
+.dashboardVersionField textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid rgba(24, 34, 45, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font: inherit;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.dashboardVersionField textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.dashboardVersionField input:focus,
+.dashboardVersionField select:focus,
+.dashboardVersionField textarea:focus {
+  outline: none;
+  border-color: rgba(15, 118, 110, 0.42);
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+  background: #fff;
+}
+
+.dashboardVersionComposerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
 .dashboardDirectoryTag {
   display: inline-flex;
   align-items: center;
@@ -1485,6 +1565,7 @@ h1 {
   .grid,
   .cards,
   .dashboardDirectory,
+  .dashboardVersionComposerFields,
   .documentPreview,
   .metricGrid,
   .runtimeSnapshot,

@@ -97,6 +97,7 @@ type ApiReferenceResponse = {
 type DashboardApiResponse = {
   slug: string;
   title: string;
+  description: string | null;
   latestVersionNumber: number;
   latestVersionStatus: 'draft' | 'published' | 'archived';
   ownerPrincipalKey: string;
@@ -123,6 +124,8 @@ type DashboardVersionSummaryResponse = {
   createdBy: string;
   createdAt: string;
 };
+
+type DashboardVersionStatus = DashboardVersionSummaryResponse['status'];
 
 type QueryResultValue = string | number | boolean;
 
@@ -236,6 +239,7 @@ const runtimeCanvasZoomPercentMin = 85;
 const runtimeCanvasZoomPercentMax = 170;
 const clearStarterHistoryConfirmTimeoutMs = 4000;
 const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f'] as const;
+const dashboardVersionStatuses: DashboardVersionStatus[] = ['draft', 'published', 'archived'];
 const starterDashboardBootstrapOwnerKey = 'system-bootstrap';
 const starterRefreshHistoryStorageKey = 'flooks.starter-refresh-history';
 const starterRefreshHistoryFilterStorageKey = 'flooks.starter-refresh-history-filter';
@@ -1000,6 +1004,12 @@ function App() {
     null,
   );
   const [dashboardOwnerPrincipalKey, setDashboardOwnerPrincipalKey] = useState<string | null>(null);
+  const [dashboardVersionDraftCreatedBy, setDashboardVersionDraftCreatedBy] = useState<string>('web-shell');
+  const [dashboardVersionDraftSummary, setDashboardVersionDraftSummary] = useState<string>('');
+  const [dashboardVersionDraftDescription, setDashboardVersionDraftDescription] = useState<string>('');
+  const [dashboardVersionDraftStatus, setDashboardVersionDraftStatus] =
+    useState<DashboardVersionStatus>('draft');
+  const [isSavingDashboardVersion, setIsSavingDashboardVersion] = useState<boolean>(false);
   const [starterRefreshOutcome, setStarterRefreshOutcome] = useState<StarterRefreshOutcome>(null);
   const [starterRefreshHistory, setStarterRefreshHistory] = useState<StarterRefreshHistoryEntry[]>(() =>
     loadStarterRefreshHistory(),
@@ -1024,6 +1034,8 @@ function App() {
 
   function applyDashboardPayload(payload: DashboardApiResponse): void {
     const isViewingLatestDashboardVersion = payload.document.version === payload.latestVersionNumber;
+    const viewedVersionSummary =
+      payload.versions.find((version) => version.versionNumber === payload.document.version) ?? null;
 
     setDashboardDocument(payload.document);
     setDashboardVersions(payload.versions);
@@ -1037,6 +1049,12 @@ function App() {
     setPersistedDashboardUpdatedAt(payload.updatedAt);
     setPersistedDashboardVersionStatus(payload.latestVersionStatus);
     setDashboardOwnerPrincipalKey(payload.ownerPrincipalKey);
+    setDashboardVersionDraftCreatedBy((currentValue) =>
+      currentValue.trim().length > 0 ? currentValue : payload.ownerPrincipalKey,
+    );
+    setDashboardVersionDraftSummary('');
+    setDashboardVersionDraftDescription(payload.description ?? '');
+    setDashboardVersionDraftStatus(viewedVersionSummary?.status ?? payload.latestVersionStatus);
   }
 
   function applyStarterSeedFallback(notice: string, tone: 'default' | 'error'): void {
@@ -1047,6 +1065,9 @@ function App() {
     setPersistedDashboardUpdatedAt(null);
     setPersistedDashboardVersionStatus(null);
     setDashboardOwnerPrincipalKey(null);
+    setDashboardVersionDraftSummary('');
+    setDashboardVersionDraftDescription('');
+    setDashboardVersionDraftStatus('draft');
     setSelectedDashboardVersionNumber(null);
     setStarterRefreshOutcome(null);
     setDashboardNotice(notice);
@@ -1220,6 +1241,70 @@ function App() {
         error instanceof Error ? error.message : `Unable to load ${requestedDashboardLabel}.`,
       );
       setDashboardNoticeTone('error');
+    }
+  }
+
+  async function handleCreateDashboardVersion(): Promise<void> {
+    if (selectedDashboardSummary == null) {
+      return;
+    }
+
+    const createdBy = dashboardVersionDraftCreatedBy.trim();
+    const summary = dashboardVersionDraftSummary.trim();
+    const nextDescription = dashboardVersionDraftDescription.trim();
+
+    if (createdBy.length === 0) {
+      setDashboardNotice('Created by is required to persist a new dashboard revision.');
+      setDashboardNoticeTone('error');
+      return;
+    }
+
+    try {
+      setIsSavingDashboardVersion(true);
+      setDashboardNotice(null);
+      setDashboardNoticeTone('default');
+
+      const response = await fetch(`${API_BASE_URL}/dashboards/${selectedDashboardSummary.slug}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          createdBy,
+          summary: summary.length > 0 ? summary : null,
+          status: dashboardVersionDraftStatus,
+          description: nextDescription.length > 0 ? nextDescription : null,
+          document: dashboardDocument,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(
+            response,
+            `Unable to create a new version for dashboard '${selectedDashboardSummary.slug}'.`,
+          ),
+        );
+      }
+
+      const payload = (await response.json()) as DashboardApiResponse;
+
+      setSelectedDashboardVersionNumber(null);
+      applyDashboardPayload(payload);
+      setDashboardNotice(
+        `Dashboard '${payload.slug}' advanced to persisted version ${payload.latestVersionNumber}.`,
+      );
+      setDashboardNoticeTone('success');
+      void loadDashboardDirectory();
+    } catch (error) {
+      setDashboardNotice(
+        error instanceof Error
+          ? error.message
+          : `Unable to create a new version for dashboard '${selectedDashboardSummary.slug}'.`,
+      );
+      setDashboardNoticeTone('error');
+    } finally {
+      setIsSavingDashboardVersion(false);
     }
   }
 
@@ -1609,6 +1694,10 @@ function App() {
       : null;
   const isSelectedStarterDashboard = dashboardDocument.key === starterDashboard.key;
   const isPersistedStarterDashboard = isSelectedStarterDashboard && persistedDashboardVersion != null;
+  const isViewingHistoricalDashboardVersion =
+    selectedDashboardVersionNumber != null &&
+    latestDashboardVersionSummary != null &&
+    selectedDashboardVersionNumber !== latestDashboardVersionSummary.versionNumber;
   const isBootstrapManagedStarterDashboard =
     isPersistedStarterDashboard && dashboardOwnerPrincipalKey === starterDashboardBootstrapOwnerKey;
   const isUserManagedStarterDashboard =
@@ -1638,6 +1727,13 @@ function App() {
       : starterRefreshHistory.length > 0
       ? 'Clear recent starter actions saved for this browser session'
       : 'No recent starter actions saved for this browser session';
+  const isCreateDashboardVersionDisabled =
+    selectedDashboardSummary == null || isSavingDashboardVersion;
+  const createDashboardVersionTitle = isCreateDashboardVersionDisabled
+    ? 'Select a persisted dashboard before creating a new revision.'
+    : isViewingHistoricalDashboardVersion
+      ? `Persist a new latest revision using the currently loaded v${selectedDashboardVersionNumber} document.`
+      : `Persist a new latest revision for dashboard '${selectedDashboardSummary.slug}'.`;
   const starterRefreshHistoryFilterCounts: Record<StarterRefreshHistoryKind, number> = {
     created: starterRefreshHistory.filter((entry) => entry.actionKind === 'created').length,
     refreshed: starterRefreshHistory.filter((entry) => entry.actionKind === 'refreshed').length,
@@ -1941,6 +2037,85 @@ function App() {
                   </div>
                 </div>
               ) : null}
+              <div className="dashboardVersionComposer">
+                <div className="dashboardVersionComposerHeader">
+                  <div>
+                    <h3>Create next revision</h3>
+                    <p className="runtimeMeta">
+                      Persist the currently loaded dashboard document as the next latest version.
+                    </p>
+                  </div>
+                  {isViewingHistoricalDashboardVersion ? (
+                    <span className="dashboardDirectoryTag">Based on v{selectedDashboardVersionNumber}</span>
+                  ) : latestDashboardVersionSummary ? (
+                    <span className="dashboardDirectoryTag">
+                      Based on latest v{latestDashboardVersionSummary.versionNumber}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="dashboardVersionComposerFields">
+                  <label className="dashboardVersionField">
+                    <span>Created by</span>
+                    <input
+                      type="text"
+                      value={dashboardVersionDraftCreatedBy}
+                      onChange={(event) => setDashboardVersionDraftCreatedBy(event.target.value)}
+                      placeholder="web-shell"
+                    />
+                  </label>
+                  <label className="dashboardVersionField">
+                    <span>Status</span>
+                    <select
+                      value={dashboardVersionDraftStatus}
+                      onChange={(event) =>
+                        setDashboardVersionDraftStatus(event.target.value as DashboardVersionStatus)
+                      }
+                    >
+                      {dashboardVersionStatuses.map((statusOption) => (
+                        <option value={statusOption} key={statusOption}>
+                          {statusOption}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="dashboardVersionField dashboardVersionFieldWide">
+                    <span>Summary</span>
+                    <input
+                      type="text"
+                      value={dashboardVersionDraftSummary}
+                      onChange={(event) => setDashboardVersionDraftSummary(event.target.value)}
+                      placeholder="Published executive dashboard for review."
+                    />
+                  </label>
+                  <label className="dashboardVersionField dashboardVersionFieldWide">
+                    <span>Description override</span>
+                    <textarea
+                      value={dashboardVersionDraftDescription}
+                      onChange={(event) => setDashboardVersionDraftDescription(event.target.value)}
+                      rows={3}
+                      placeholder="Leave blank to keep the current dashboard description."
+                    />
+                  </label>
+                </div>
+                <div className="dashboardVersionComposerActions">
+                  <p className="runtimeMeta">
+                    {isViewingHistoricalDashboardVersion
+                      ? `Saving now will create a new latest revision from v${selectedDashboardVersionNumber}.`
+                      : 'Saving now will create a new latest revision from the currently loaded dashboard.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="runtimeControl"
+                    disabled={isCreateDashboardVersionDisabled}
+                    onClick={() => {
+                      void handleCreateDashboardVersion();
+                    }}
+                    title={createDashboardVersionTitle}
+                  >
+                    {isSavingDashboardVersion ? 'Saving revision...' : 'Create revision'}
+                  </button>
+                </div>
+              </div>
             </div>
           ) : null}
         </section>
