@@ -370,6 +370,23 @@ Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
 - `npm run build:web`
 
+## 92dc0fde · Highlight runtime lifecycle state
+
+Intent: pull publish/archive history closer to the live preview so operators can read the selected dashboard's lifecycle state without dropping back to the directory grid.
+
+What changed:
+- `apps/web/src/App.tsx` now derives a runtime lifecycle summary for the selected dashboard from the existing lifecycle aggregate fields already present on dashboard summaries.
+- `apps/web/src/App.tsx` added a `Lifecycle` snapshot card above the runtime preview that distinguishes starter-seed, draft, published, and archived latest states while also showing published/archive history counts.
+- `apps/web/src/styles.css` updated the runtime snapshot grid to auto-fit card widths so the extra lifecycle card can sit naturally alongside the existing dashboard, page, panel, and ownership cards.
+
+Functional result:
+- Operators can now read the selected dashboard's latest lifecycle state directly from the runtime header instead of correlating the preview with the directory cards below.
+- Published and archived history stays visible even after a dashboard is loaded into the live runtime preview.
+- The top of the live preview feels more like an operational dashboard shell because lifecycle state is summarized alongside ownership and runtime metrics.
+
+Validation:
+- `npm run build:web`
+
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
