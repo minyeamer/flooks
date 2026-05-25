@@ -633,11 +633,110 @@ function App() {
   const [runtimeCanvasZoomPercent, setRuntimeCanvasZoomPercent] = useState<number>(
     runtimeCanvasZoomPercentDefault,
   );
+  const [isRefreshingStarterDashboard, setIsRefreshingStarterDashboard] = useState<boolean>(false);
   const [panelRuntime, setPanelRuntime] = useState<Record<string, PanelRuntimeEntry>>(() =>
     buildInitialPanelRuntime(starterDashboard, getDefaultDashboardPageId(starterDashboard)),
   );
   const [requestState, setRequestState] = useState<RequestState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  function applyDashboardPayload(payload: DashboardApiResponse): void {
+    setDashboardDocument(payload.document);
+    setDashboardSourceLabel(`Persisted v${payload.latestVersionNumber}`);
+  }
+
+  async function loadDashboardDocument(signal?: AbortSignal): Promise<void> {
+    try {
+      setDashboardNotice(null);
+
+      const response = await fetch(`${API_BASE_URL}/dashboards/${starterDashboard.key}`, {
+        signal,
+      });
+
+      if (response.status === 404) {
+        if (signal?.aborted) {
+          return;
+        }
+
+        setDashboardDocument(starterDashboard);
+        setDashboardSourceLabel('Starter seed');
+        setDashboardNotice(
+          `Persisted dashboard '${starterDashboard.key}' was not found yet. Using the starter document.`,
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(
+            response,
+            `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
+          ),
+        );
+      }
+
+      const payload = (await response.json()) as DashboardApiResponse;
+
+      if (signal?.aborted) {
+        return;
+      }
+
+      applyDashboardPayload(payload);
+    } catch (error) {
+      if (signal?.aborted) {
+        return;
+      }
+
+      setDashboardDocument(starterDashboard);
+      setDashboardSourceLabel('Starter seed');
+      setDashboardNotice(
+        error instanceof Error
+          ? error.message
+          : `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
+      );
+    }
+  }
+
+  async function handleRefreshStarterDashboard(): Promise<void> {
+    try {
+      setIsRefreshingStarterDashboard(true);
+      setDashboardNotice(null);
+
+      const response = await fetch(
+        `${API_BASE_URL}/dashboards/${starterDashboard.key}/refresh-starter`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(
+            response,
+            `Unable to refresh starter dashboard '${starterDashboard.key}'.`,
+          ),
+        );
+      }
+
+      const payload = (await response.json()) as DashboardApiResponse;
+
+      applyDashboardPayload(payload);
+      setDashboardNotice(
+        `Starter dashboard '${payload.slug}' is now available as persisted version ${payload.latestVersionNumber}.`,
+      );
+    } catch (error) {
+      setDashboardNotice(
+        error instanceof Error
+          ? error.message
+          : `Unable to refresh starter dashboard '${starterDashboard.key}'.`,
+      );
+    } finally {
+      setIsRefreshingStarterDashboard(false);
+    }
+  }
 
   function resetRuntimeCanvasView(): void {
     setRuntimeCanvasScaleMode('fit');
@@ -736,60 +835,7 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
 
-    async function loadDashboardDocument() {
-      try {
-        setDashboardNotice(null);
-
-        const response = await fetch(`${API_BASE_URL}/dashboards/${starterDashboard.key}`, {
-          signal: controller.signal,
-        });
-
-        if (response.status === 404) {
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          setDashboardDocument(starterDashboard);
-          setDashboardSourceLabel('Starter seed');
-          setDashboardNotice(
-            `Persisted dashboard '${starterDashboard.key}' was not found yet. Using the starter document.`,
-          );
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(
-            await getResponseMessage(
-              response,
-              `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
-            ),
-          );
-        }
-
-        const payload = (await response.json()) as DashboardApiResponse;
-
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setDashboardDocument(payload.document);
-        setDashboardSourceLabel(`Persisted v${payload.latestVersionNumber}`);
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setDashboardDocument(starterDashboard);
-        setDashboardSourceLabel('Starter seed');
-        setDashboardNotice(
-          error instanceof Error
-            ? error.message
-            : `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
-        );
-      }
-    }
-
-    void loadDashboardDocument();
+    void loadDashboardDocument(controller.signal);
 
     return () => {
       controller.abort();
@@ -1200,6 +1246,19 @@ function App() {
                   placements
                 </p>
               ) : null}
+              <div className="runtimeControlGroup" aria-label="Starter dashboard actions">
+                <button
+                  type="button"
+                  className="runtimeControl"
+                  disabled={isRefreshingStarterDashboard}
+                  onClick={() => {
+                    void handleRefreshStarterDashboard();
+                  }}
+                  title="Create or refresh the canonical starter dashboard"
+                >
+                  {isRefreshingStarterDashboard ? 'Refreshing starter...' : 'Refresh starter'}
+                </button>
+              </div>
               <div className="runtimeControlGroup" aria-label="Runtime canvas view mode">
                 {runtimeCanvasScaleModes.map((mode) => (
                   <button
