@@ -104,6 +104,17 @@ type DashboardApiResponse = {
   document: DashboardDocument;
 };
 
+type DashboardSummaryResponse = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  ownerPrincipalKey: string;
+  latestVersionNumber: number;
+  latestVersionStatus: 'draft' | 'published' | 'archived';
+  updatedAt: string;
+};
+
 type QueryResultValue = string | number | boolean;
 
 type QueryExecutionRow = Record<string, QueryResultValue>;
@@ -959,6 +970,10 @@ function App() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [apiReference, setApiReference] = useState<ApiReferenceResponse | null>(null);
+  const [dashboardSummaries, setDashboardSummaries] = useState<DashboardSummaryResponse[]>([]);
+  const [selectedDashboardSlug, setSelectedDashboardSlug] = useState<string>(starterDashboard.key);
+  const [dashboardDirectoryState, setDashboardDirectoryState] = useState<RequestState>('loading');
+  const [dashboardDirectoryErrorMessage, setDashboardDirectoryErrorMessage] = useState<string | null>(null);
   const [dashboardDocument, setDashboardDocument] = useState<DashboardDocument>(starterDashboard);
   const [activePageId, setActivePageId] = useState<string | null>(() =>
     getDefaultDashboardPageId(starterDashboard),
@@ -996,6 +1011,7 @@ function App() {
 
   function applyDashboardPayload(payload: DashboardApiResponse): void {
     setDashboardDocument(payload.document);
+    setSelectedDashboardSlug(payload.slug);
     setDashboardSourceLabel(`Persisted v${payload.latestVersionNumber}`);
     setPersistedDashboardVersion(payload.latestVersionNumber);
     setPersistedDashboardUpdatedAt(payload.updatedAt);
@@ -1069,12 +1085,52 @@ function App() {
     });
   }
 
-  async function loadDashboardDocument(signal?: AbortSignal): Promise<void> {
+  async function loadDashboardDirectory(signal?: AbortSignal): Promise<void> {
+    try {
+      setDashboardDirectoryState('loading');
+      setDashboardDirectoryErrorMessage(null);
+
+      const response = await fetch(`${API_BASE_URL}/dashboards`, { signal });
+
+      if (!response.ok) {
+        throw new Error(
+          await getResponseMessage(response, 'Unable to load dashboards from the metadata store.'),
+        );
+      }
+
+      const payload = (await response.json()) as DashboardSummaryResponse[];
+
+      if (signal?.aborted) {
+        return;
+      }
+
+      setDashboardSummaries(payload);
+      setSelectedDashboardSlug((currentSlug) =>
+        payload.some((summary) => summary.slug === currentSlug)
+          ? currentSlug
+          : payload[0]?.slug ?? starterDashboard.key,
+      );
+      setDashboardDirectoryState('ready');
+    } catch (error) {
+      if (signal?.aborted) {
+        return;
+      }
+
+      setDashboardDirectoryState('error');
+      setDashboardDirectoryErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to load dashboards from the metadata store.',
+      );
+    }
+  }
+
+  async function loadDashboardDocument(slug: string, signal?: AbortSignal): Promise<void> {
     try {
       setDashboardNotice(null);
       setDashboardNoticeTone('default');
 
-      const response = await fetch(`${API_BASE_URL}/dashboards/${starterDashboard.key}`, {
+      const response = await fetch(`${API_BASE_URL}/dashboards/${slug}`, {
         signal,
       });
 
@@ -1083,10 +1139,15 @@ function App() {
           return;
         }
 
-        applyStarterSeedFallback(
-          `Persisted dashboard '${starterDashboard.key}' was not found yet. Using the starter document.`,
-          'default',
-        );
+        if (slug === starterDashboard.key) {
+          applyStarterSeedFallback(
+            `Persisted dashboard '${starterDashboard.key}' was not found yet. Using the starter document.`,
+            'default',
+          );
+          return;
+        }
+
+        throw new Error(`Dashboard '${slug}' was not found.`);
         return;
       }
 
@@ -1094,7 +1155,7 @@ function App() {
         throw new Error(
           await getResponseMessage(
             response,
-            `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
+            `Unable to load dashboard '${slug}'.`,
           ),
         );
       }
@@ -1111,12 +1172,20 @@ function App() {
         return;
       }
 
-      applyStarterSeedFallback(
-        error instanceof Error
-          ? error.message
-          : `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
-        'error',
+      if (slug === starterDashboard.key) {
+        applyStarterSeedFallback(
+          error instanceof Error
+            ? `${error.message} Using the starter document instead.`
+            : `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
+          'error',
+        );
+        return;
+      }
+
+      setDashboardNotice(
+        error instanceof Error ? error.message : `Unable to load dashboard '${slug}'.`,
       );
+      setDashboardNoticeTone('error');
     }
   }
 
@@ -1191,6 +1260,7 @@ function App() {
         }),
       );
       setDashboardNoticeTone('success');
+      void loadDashboardDirectory();
     } catch (error) {
       const refreshErrorMessage =
         error instanceof Error
@@ -1316,12 +1386,22 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
 
-    void loadDashboardDocument(controller.signal);
+    void loadDashboardDirectory(controller.signal);
 
     return () => {
       controller.abort();
     };
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void loadDashboardDocument(selectedDashboardSlug, controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [selectedDashboardSlug]);
 
   useEffect(() => {
     persistStarterRefreshHistory(starterRefreshHistory);
@@ -1471,7 +1551,10 @@ function App() {
   const liveModules = system?.modules ?? [];
   const activeDashboardPage = getActiveDashboardPage(dashboardDocument, activePageId);
   const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
-  const isPersistedStarterDashboard = persistedDashboardVersion != null;
+  const selectedDashboardSummary =
+    dashboardSummaries.find((summary) => summary.slug === selectedDashboardSlug) ?? null;
+  const isSelectedStarterDashboard = dashboardDocument.key === starterDashboard.key;
+  const isPersistedStarterDashboard = isSelectedStarterDashboard && persistedDashboardVersion != null;
   const isBootstrapManagedStarterDashboard =
     isPersistedStarterDashboard && dashboardOwnerPrincipalKey === starterDashboardBootstrapOwnerKey;
   const isUserManagedStarterDashboard =
@@ -1486,10 +1569,13 @@ function App() {
     : isBootstrapManagedStarterDashboard
       ? 'The backend can refresh this starter dashboard because it is still owned by system-bootstrap.'
       : 'Refresh starter is disabled because the persisted starter dashboard is now user-managed.';
-  const isStarterRefreshDisabled = isRefreshingStarterDashboard || isUserManagedStarterDashboard;
-  const refreshStarterTitle = isUserManagedStarterDashboard
-    ? 'User-managed starter dashboards cannot be refreshed from the canonical seed.'
-    : 'Create or refresh the canonical starter dashboard';
+  const isStarterRefreshDisabled =
+    !isSelectedStarterDashboard || isRefreshingStarterDashboard || isUserManagedStarterDashboard;
+  const refreshStarterTitle = !isSelectedStarterDashboard
+    ? 'Starter refresh only applies to the canonical starter dashboard.'
+    : isUserManagedStarterDashboard
+      ? 'User-managed starter dashboards cannot be refreshed from the canonical seed.'
+      : 'Create or refresh the canonical starter dashboard';
   const isClearStarterHistoryDisabled =
     isRefreshingStarterDashboard || starterRefreshHistory.length === 0;
   const clearStarterHistoryTitle =
@@ -1633,6 +1719,9 @@ function App() {
             </span>
           </div>
           <div className="heroActions" aria-label="Jump to live shell sections">
+            <a className="heroAction" href="#dashboard-directory">
+              Browse dashboards
+            </a>
             <a className="heroAction heroActionPrimary" href="#live-dashboard-runtime">
               Open live dashboard preview
             </a>
@@ -1660,6 +1749,75 @@ function App() {
       </header>
 
       <main className="grid">
+        <section className="panel panelWide" id="dashboard-directory">
+          <div className="panelHeader">
+            <span className="chip">Dashboard Directory</span>
+            <h2>Choose a live dashboard</h2>
+            <p className="sectionSummary">
+              The metadata store can already list versioned dashboards. Select one to load it into
+              the live runtime preview below.
+            </p>
+            <p className="runtimeMeta">
+              {dashboardSummaries.length} dashboard{dashboardSummaries.length === 1 ? '' : 's'} in
+              the current store{selectedDashboardSummary ? ` · ${selectedDashboardSummary.title} loaded` : ''}
+            </p>
+          </div>
+          {dashboardDirectoryState === 'error' ? (
+            <p className="callout calloutError">
+              {dashboardDirectoryErrorMessage ?? 'The dashboard directory is not reachable yet.'}
+            </p>
+          ) : dashboardSummaries.length > 0 ? (
+            <div className="dashboardDirectory">
+              {dashboardSummaries.map((summary) => {
+                const isSelectedDashboard = summary.slug === selectedDashboardSlug;
+                const formattedSummaryUpdatedAt = dateTimeFormatter.format(new Date(summary.updatedAt));
+
+                return (
+                  <button
+                    type="button"
+                    className={`dashboardDirectoryCard${isSelectedDashboard ? ' dashboardDirectoryCardActive' : ''}`}
+                    key={summary.id}
+                    onClick={() => setSelectedDashboardSlug(summary.slug)}
+                    aria-pressed={isSelectedDashboard}
+                    title={
+                      isSelectedDashboard
+                        ? `Dashboard '${summary.slug}' is loaded in the live runtime preview.`
+                        : `Load dashboard '${summary.slug}' into the live runtime preview.`
+                    }
+                  >
+                    <div className="dashboardDirectoryCardHeader">
+                      <div>
+                        <strong>{summary.title}</strong>
+                        <p className="runtimeMeta">{summary.slug}</p>
+                      </div>
+                      <span
+                        className={`runtimeStatusPill${isSelectedDashboard ? ' runtimeStatusPillManaged' : ''}`}
+                      >
+                        {isSelectedDashboard ? 'Loaded' : `v${summary.latestVersionNumber}`}
+                      </span>
+                    </div>
+                    <p>
+                      {summary.description ?? 'No description has been recorded for this dashboard yet.'}
+                    </p>
+                    <div className="dashboardDirectoryLabels" aria-label="Dashboard summary metadata">
+                      <span className="dashboardDirectoryTag">v{summary.latestVersionNumber}</span>
+                      <span className="dashboardDirectoryTag">{summary.latestVersionStatus}</span>
+                      <span className="dashboardDirectoryTag">{summary.ownerPrincipalKey}</span>
+                      <span className="dashboardDirectoryTag">Updated {formattedSummaryUpdatedAt}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="callout">
+              {dashboardDirectoryState === 'loading'
+                ? 'Loading dashboards from the metadata store...'
+                : 'No dashboards have been persisted yet.'}
+            </p>
+          )}
+        </section>
+
         <section className="panel panelWide">
           <div className="panelHeader">
             <span className="chip">Launch Tracks</span>
@@ -1927,180 +2085,184 @@ function App() {
                   placements
                 </p>
               ) : null}
-              <div className="runtimeStarterStatus">
-                <div className="runtimeStarterStatusHeader">
-                  <span
-                    className={`runtimeStatusPill${isUserManagedStarterDashboard ? ' runtimeStatusPillProtected' : isPersistedStarterDashboard ? ' runtimeStatusPillManaged' : ''}`}
-                  >
-                    Starter: {starterDashboardStatusLabel}
-                  </span>
-                  {starterRefreshOutcomeLabel ? (
-                    <span className="runtimeStatusPill runtimeStatusPillOutcome">
-                      Last action: {starterRefreshOutcomeLabel}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="runtimeMeta">{starterDashboardStatusMessage}</p>
-                {isPersistedStarterDashboard ? (
-                  <p className="runtimeMeta">
-                    {persistedDashboardVersionStatus != null
-                      ? `Version status: ${persistedDashboardVersionStatus}`
-                      : 'Version status unavailable'}
-                    {formattedPersistedDashboardUpdatedAt ? ` · Updated ${formattedPersistedDashboardUpdatedAt}` : ''}
-                    {dashboardOwnerPrincipalKey ? ` · Owner ${dashboardOwnerPrincipalKey}` : ''}
-                  </p>
-                ) : null}
-                {starterRefreshHistory.length > 0 ? (
-                  <div className="runtimeStarterHistory" aria-label="Recent starter refresh actions">
-                    <div className="runtimeStarterHistorySummary">
-                      <div className="runtimeStarterHistorySummaryText">
-                        <strong>Recent starter actions</strong>
-                        <span>Persists for this browser session</span>
-                        <div className="runtimeStarterHistorySummaryMeta" aria-label="Starter history view state">
-                          <span className="runtimeStarterHistorySummaryBadge">
-                            Viewing {activeStarterRefreshHistoryFilterLabel}
-                          </span>
-                          <span className="runtimeStarterHistorySummaryBadge">
-                            {activeStarterRefreshHistoryCount} item
-                            {activeStarterRefreshHistoryCount === 1 ? '' : 's'}
-                          </span>
-                          {latestVisibleStarterRefreshHistoryEntry ? (
-                            <span
-                              className="runtimeStarterHistorySummaryBadge"
-                              title={latestVisibleStarterRefreshHistoryEntry.timestampLabel}
-                            >
-                              Latest{' '}
-                              {latestVisibleStarterRefreshHistoryRelativeLabel ??
-                                latestVisibleStarterRefreshHistoryEntry.timestampLabel}
-                            </span>
-                          ) : null}
-                          {latestFailedStarterRefreshHistoryEntry ? (
-                            <span
-                              className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert"
-                              title={latestFailedStarterRefreshHistoryEntry.timestampLabel}
-                            >
-                              Latest failure{' '}
-                              {latestFailedStarterRefreshHistoryRelativeLabel ??
-                                latestFailedStarterRefreshHistoryEntry.timestampLabel}
-                            </span>
-                          ) : null}
-                          {openVisibleStarterRefreshHistoryErrorsCount > 0 ? (
-                            <span className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert">
-                              {openVisibleStarterRefreshHistoryErrorsCount} raw error
-                              {openVisibleStarterRefreshHistoryErrorsCount === 1 ? '' : 's'} open
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="runtimeStarterHistoryFilters" aria-label="Starter history filters">
-                        {starterRefreshHistoryFilterOptions.map((filterOption) => (
-                          <button
-                            type="button"
-                            className={`runtimeStarterHistoryFilterButton${starterRefreshHistoryFilter === filterOption.id ? ' runtimeStarterHistoryFilterButtonActive' : ''}`}
-                            disabled={filterOption.id !== 'all' && filterOption.count === 0}
-                            onClick={() => setStarterRefreshHistoryFilter(filterOption.id)}
-                            aria-label={
-                              filterOption.count != null
-                                ? `Show ${filterOption.label.toLowerCase()} starter actions (${filterOption.count})`
-                                : `Show ${filterOption.label.toLowerCase()} starter actions`
-                            }
-                            key={filterOption.id}
-                            title={
-                              filterOption.count == null
-                                ? 'Show all starter actions in this browser session'
-                                : filterOption.count > 0
-                                  ? `Show ${filterOption.count} ${filterOption.label.toLowerCase()} starter action${filterOption.count === 1 ? '' : 's'}`
-                                  : `No ${filterOption.label.toLowerCase()} starter actions in this browser session`
-                            }
-                          >
-                            <span>{filterOption.label}</span>
-                            {filterOption.count != null ? (
-                              <span className="runtimeStarterHistoryFilterCount" aria-hidden="true">
-                                {filterOption.count}
-                              </span>
-                            ) : null}
-                          </button>
-                        ))}
-                      </div>
+              {isSelectedStarterDashboard ? (
+                <>
+                  <div className="runtimeStarterStatus">
+                    <div className="runtimeStarterStatusHeader">
+                      <span
+                        className={`runtimeStatusPill${isUserManagedStarterDashboard ? ' runtimeStatusPillProtected' : isPersistedStarterDashboard ? ' runtimeStatusPillManaged' : ''}`}
+                      >
+                        Starter: {starterDashboardStatusLabel}
+                      </span>
+                      {starterRefreshOutcomeLabel ? (
+                        <span className="runtimeStatusPill runtimeStatusPillOutcome">
+                          Last action: {starterRefreshOutcomeLabel}
+                        </span>
+                      ) : null}
                     </div>
-                    {visibleStarterRefreshHistory.length > 0 ? (
-                      visibleStarterRefreshHistory.map((entry) => (
-                        <article
-                          className={`runtimeStarterHistoryItem${entry.tone === 'error' ? ' runtimeStarterHistoryItemError' : ''}`}
-                          key={entry.id}
-                        >
-                          <div className="runtimeStarterHistoryHeader">
-                            <div className="runtimeStarterHistoryHeadline">
-                              {entry.actionKind ? (
+                    <p className="runtimeMeta">{starterDashboardStatusMessage}</p>
+                    {isPersistedStarterDashboard ? (
+                      <p className="runtimeMeta">
+                        {persistedDashboardVersionStatus != null
+                          ? `Version status: ${persistedDashboardVersionStatus}`
+                          : 'Version status unavailable'}
+                        {formattedPersistedDashboardUpdatedAt ? ` · Updated ${formattedPersistedDashboardUpdatedAt}` : ''}
+                        {dashboardOwnerPrincipalKey ? ` · Owner ${dashboardOwnerPrincipalKey}` : ''}
+                      </p>
+                    ) : null}
+                    {starterRefreshHistory.length > 0 ? (
+                      <div className="runtimeStarterHistory" aria-label="Recent starter refresh actions">
+                        <div className="runtimeStarterHistorySummary">
+                          <div className="runtimeStarterHistorySummaryText">
+                            <strong>Recent starter actions</strong>
+                            <span>Persists for this browser session</span>
+                            <div className="runtimeStarterHistorySummaryMeta" aria-label="Starter history view state">
+                              <span className="runtimeStarterHistorySummaryBadge">
+                                Viewing {activeStarterRefreshHistoryFilterLabel}
+                              </span>
+                              <span className="runtimeStarterHistorySummaryBadge">
+                                {activeStarterRefreshHistoryCount} item
+                                {activeStarterRefreshHistoryCount === 1 ? '' : 's'}
+                              </span>
+                              {latestVisibleStarterRefreshHistoryEntry ? (
                                 <span
-                                  className={`runtimeStarterHistoryBadge runtimeStarterHistoryBadge${entry.actionKind[0].toUpperCase()}${entry.actionKind.slice(1)}`}
+                                  className="runtimeStarterHistorySummaryBadge"
+                                  title={latestVisibleStarterRefreshHistoryEntry.timestampLabel}
                                 >
-                                  {getStarterRefreshHistoryKindLabel(entry.actionKind)}
+                                  Latest{' '}
+                                  {latestVisibleStarterRefreshHistoryRelativeLabel ??
+                                    latestVisibleStarterRefreshHistoryEntry.timestampLabel}
                                 </span>
                               ) : null}
-                              <strong>{entry.summary}</strong>
-                            </div>
-                            <span>{entry.timestampLabel}</span>
-                          </div>
-                          <p>{entry.detail}</p>
-                          {entry.rawDetail != null ? (
-                            <details
-                              className="runtimeStarterHistoryErrorDetails"
-                              onToggle={(event) => {
-                                setStarterRefreshHistoryErrorOpenState(
-                                  entry.id,
-                                  event.currentTarget.open,
-                                );
-                              }}
-                              open={openStarterRefreshHistoryErrors.includes(entry.id)}
-                            >
-                              <summary className="runtimeStarterHistoryErrorSummary">Raw error</summary>
-                              <p className="runtimeStarterHistoryErrorMessage">{entry.rawDetail}</p>
-                            </details>
-                          ) : null}
-                          {entry.contextLabels.length > 0 ? (
-                            <div className="runtimeStarterHistoryLabels" aria-label="Starter action context">
-                              {entry.contextLabels.map((label) => (
-                                <span className="runtimeStarterHistoryTag" key={`${entry.id}-${label}`}>
-                                  {label}
+                              {latestFailedStarterRefreshHistoryEntry ? (
+                                <span
+                                  className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert"
+                                  title={latestFailedStarterRefreshHistoryEntry.timestampLabel}
+                                >
+                                  Latest failure{' '}
+                                  {latestFailedStarterRefreshHistoryRelativeLabel ??
+                                    latestFailedStarterRefreshHistoryEntry.timestampLabel}
                                 </span>
-                              ))}
+                              ) : null}
+                              {openVisibleStarterRefreshHistoryErrorsCount > 0 ? (
+                                <span className="runtimeStarterHistorySummaryBadge runtimeStarterHistorySummaryBadgeAlert">
+                                  {openVisibleStarterRefreshHistoryErrorsCount} raw error
+                                  {openVisibleStarterRefreshHistoryErrorsCount === 1 ? '' : 's'} open
+                                </span>
+                              ) : null}
                             </div>
-                          ) : null}
-                        </article>
-                      ))
-                    ) : (
-                      <p className="runtimeStarterHistoryEmpty">
-                        No {activeStarterRefreshHistoryFilterLabel.toLowerCase()} starter actions in this browser session.
-                      </p>
-                    )}
+                          </div>
+                          <div className="runtimeStarterHistoryFilters" aria-label="Starter history filters">
+                            {starterRefreshHistoryFilterOptions.map((filterOption) => (
+                              <button
+                                type="button"
+                                className={`runtimeStarterHistoryFilterButton${starterRefreshHistoryFilter === filterOption.id ? ' runtimeStarterHistoryFilterButtonActive' : ''}`}
+                                disabled={filterOption.id !== 'all' && filterOption.count === 0}
+                                onClick={() => setStarterRefreshHistoryFilter(filterOption.id)}
+                                aria-label={
+                                  filterOption.count != null
+                                    ? `Show ${filterOption.label.toLowerCase()} starter actions (${filterOption.count})`
+                                    : `Show ${filterOption.label.toLowerCase()} starter actions`
+                                }
+                                key={filterOption.id}
+                                title={
+                                  filterOption.count == null
+                                    ? 'Show all starter actions in this browser session'
+                                    : filterOption.count > 0
+                                      ? `Show ${filterOption.count} ${filterOption.label.toLowerCase()} starter action${filterOption.count === 1 ? '' : 's'}`
+                                      : `No ${filterOption.label.toLowerCase()} starter actions in this browser session`
+                                }
+                              >
+                                <span>{filterOption.label}</span>
+                                {filterOption.count != null ? (
+                                  <span className="runtimeStarterHistoryFilterCount" aria-hidden="true">
+                                    {filterOption.count}
+                                  </span>
+                                ) : null}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {visibleStarterRefreshHistory.length > 0 ? (
+                          visibleStarterRefreshHistory.map((entry) => (
+                            <article
+                              className={`runtimeStarterHistoryItem${entry.tone === 'error' ? ' runtimeStarterHistoryItemError' : ''}`}
+                              key={entry.id}
+                            >
+                              <div className="runtimeStarterHistoryHeader">
+                                <div className="runtimeStarterHistoryHeadline">
+                                  {entry.actionKind ? (
+                                    <span
+                                      className={`runtimeStarterHistoryBadge runtimeStarterHistoryBadge${entry.actionKind[0].toUpperCase()}${entry.actionKind.slice(1)}`}
+                                    >
+                                      {getStarterRefreshHistoryKindLabel(entry.actionKind)}
+                                    </span>
+                                  ) : null}
+                                  <strong>{entry.summary}</strong>
+                                </div>
+                                <span>{entry.timestampLabel}</span>
+                              </div>
+                              <p>{entry.detail}</p>
+                              {entry.rawDetail != null ? (
+                                <details
+                                  className="runtimeStarterHistoryErrorDetails"
+                                  onToggle={(event) => {
+                                    setStarterRefreshHistoryErrorOpenState(
+                                      entry.id,
+                                      event.currentTarget.open,
+                                    );
+                                  }}
+                                  open={openStarterRefreshHistoryErrors.includes(entry.id)}
+                                >
+                                  <summary className="runtimeStarterHistoryErrorSummary">Raw error</summary>
+                                  <p className="runtimeStarterHistoryErrorMessage">{entry.rawDetail}</p>
+                                </details>
+                              ) : null}
+                              {entry.contextLabels.length > 0 ? (
+                                <div className="runtimeStarterHistoryLabels" aria-label="Starter action context">
+                                  {entry.contextLabels.map((label) => (
+                                    <span className="runtimeStarterHistoryTag" key={`${entry.id}-${label}`}>
+                                      {label}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </article>
+                          ))
+                        ) : (
+                          <p className="runtimeStarterHistoryEmpty">
+                            No {activeStarterRefreshHistoryFilterLabel.toLowerCase()} starter actions in this browser session.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
-              <div className="runtimeControlGroup" aria-label="Starter dashboard actions">
-                <button
-                  type="button"
-                  className="runtimeControl"
-                  disabled={isStarterRefreshDisabled}
-                  onClick={() => {
-                    void handleRefreshStarterDashboard();
-                  }}
-                  title={refreshStarterTitle}
-                >
-                  {isRefreshingStarterDashboard ? 'Refreshing starter...' : 'Refresh starter'}
-                </button>
-                <button
-                  type="button"
-                  className={`runtimeControl${isClearStarterHistoryArmed ? ' runtimeControlActive' : ''}`}
-                  disabled={isClearStarterHistoryDisabled}
-                  onClick={handleClearStarterRefreshHistory}
-                  title={clearStarterHistoryTitle}
-                >
-                  {isClearStarterHistoryArmed
-                    ? `Confirm clear (${clearStarterHistoryConfirmTimeoutMs / 1000}s)`
-                    : 'Clear history'}
-                </button>
-              </div>
+                  <div className="runtimeControlGroup" aria-label="Starter dashboard actions">
+                    <button
+                      type="button"
+                      className="runtimeControl"
+                      disabled={isStarterRefreshDisabled}
+                      onClick={() => {
+                        void handleRefreshStarterDashboard();
+                      }}
+                      title={refreshStarterTitle}
+                    >
+                      {isRefreshingStarterDashboard ? 'Refreshing starter...' : 'Refresh starter'}
+                    </button>
+                    <button
+                      type="button"
+                      className={`runtimeControl${isClearStarterHistoryArmed ? ' runtimeControlActive' : ''}`}
+                      disabled={isClearStarterHistoryDisabled}
+                      onClick={handleClearStarterRefreshHistory}
+                      title={clearStarterHistoryTitle}
+                    >
+                      {isClearStarterHistoryArmed
+                        ? `Confirm clear (${clearStarterHistoryConfirmTimeoutMs / 1000}s)`
+                        : 'Clear history'}
+                    </button>
+                  </div>
+                </>
+              ) : null}
               <div className="runtimeControlGroup" aria-label="Runtime canvas view mode">
                 {runtimeCanvasScaleModes.map((mode) => (
                   <button
