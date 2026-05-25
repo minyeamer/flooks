@@ -612,3 +612,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 79284f60 · Clear starter action history
+
+Intent: let operators explicitly reset the recent starter action trail when they want a clean session-local view instead of waiting for the browser session to end.
+
+What changed:
+- `apps/web/src/App.tsx` added a dedicated clear-history handler that empties the recent starter action list, resets the current starter refresh outcome badge, and replaces the runtime notice with a local confirmation message.
+- `apps/web/src/App.tsx` now computes a separate disabled state and tooltip for clearing history so the action is unavailable while a refresh is running or when there is nothing to clear.
+- `apps/web/src/App.tsx` renders a `Clear history` control next to `Refresh starter` inside the existing starter action toolbar.
+
+Functional result:
+- Operators can now reset the session-persistent starter action trail without reloading the page or waiting for a fresh browser session.
+- Clearing the trail also removes the current outcome pill, which keeps the starter status surface internally consistent after the history has been wiped.
+- The action stays safely disabled during refresh execution and when no stored history exists.
+
+Validation:
+- `npm run build:web`
