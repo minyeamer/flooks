@@ -2117,6 +2117,28 @@ function App() {
   const runtimePreviewLabel = activeDashboardPage
     ? `${activeDashboardPage.title} · ${dashboardRuntimePanelEntries.length} live panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`
     : `${dashboardRuntimePanelEntries.length} live runtime panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`;
+  const runtimeLifecycleValue =
+    selectedDashboardSummary == null
+      ? 'Starter seed'
+      : selectedDashboardSummary.latestVersionStatus === 'published'
+        ? `Published v${selectedDashboardSummary.latestVersionNumber}`
+        : selectedDashboardSummary.latestVersionStatus === 'archived'
+          ? `Archived v${selectedDashboardSummary.latestVersionNumber}`
+          : selectedDashboardSummary.latestPublishedVersionNumber != null
+            ? `Draft v${selectedDashboardSummary.latestVersionNumber}`
+            : 'Draft-only';
+  const runtimeLifecycleDetail =
+    selectedDashboardSummary == null
+      ? 'No persisted lifecycle history yet'
+      : `Published ${selectedDashboardSummary.publishedVersionCount}${
+          selectedDashboardSummary.latestPublishedVersionNumber != null
+            ? ` · last v${selectedDashboardSummary.latestPublishedVersionNumber}`
+            : ''
+        } · Archived ${selectedDashboardSummary.archivedVersionCount}${
+          selectedDashboardSummary.latestArchivedVersionNumber != null
+            ? ` · last v${selectedDashboardSummary.latestArchivedVersionNumber}`
+            : ''
+        }`;
   const runtimeSnapshotCards = [
     {
       label: 'Dashboard',
@@ -2140,6 +2162,11 @@ function App() {
         persistedDashboardVersion != null
           ? `v${persistedDashboardVersion} · ${persistedDashboardVersionStatus ?? 'status unavailable'}`
           : 'Not persisted yet',
+    },
+    {
+      label: 'Lifecycle',
+      value: runtimeLifecycleValue,
+      detail: runtimeLifecycleDetail,
     },
   ];
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
