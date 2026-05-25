@@ -594,3 +594,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 9bc8fdb2 · Persist starter action history
+
+Intent: keep the recent starter action trail useful across browser reloads by preserving it for the lifetime of the current browser session instead of rebuilding it from scratch every time the shell mounts.
+
+What changed:
+- `apps/web/src/App.tsx` added a small `sessionStorage` persistence layer for the starter action history, including guarded JSON parsing so invalid or missing stored data falls back cleanly to an empty list.
+- `apps/web/src/App.tsx` now hydrates the recent starter action history from browser session storage on mount and writes the latest trimmed history back whenever the list changes.
+- `apps/web/src/App.tsx` also labels the recent action block as browser-session persistent so operators know the trail survives a page reload without implying long-term backend retention.
+- `apps/web/src/styles.css` added the compact summary row styling needed for the new persistence caption above the recent action cards.
+
+Functional result:
+- Operators can refresh the shell and still see the most recent starter refresh attempts from the current browser session.
+- The recent action trail now behaves more like a lightweight operator log while still remaining explicitly session-scoped.
+- The UI makes the persistence boundary clear, which reduces confusion between session-local history and backend version history.
+
+Validation:
+- `npm run build:web`
