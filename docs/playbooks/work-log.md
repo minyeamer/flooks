@@ -275,6 +275,25 @@ Functional result:
 Validation:
 - `npm run build:web`
 
+## 4f039b3f · Create dashboards from shell
+
+Intent: expose the existing dashboard create API in the web shell so operators can fork the currently loaded dashboard document into a brand-new persisted dashboard without leaving the homepage.
+
+What changed:
+- `apps/web/src/App.tsx` now keeps a create-dashboard draft for slug, title, owner kind/key, creator, initial status, summary, and optional description alongside the existing dashboard directory state.
+- `apps/web/src/App.tsx` derives sensible copy defaults from the currently loaded dashboard, normalizes the requested slug, regenerates a dashboard document id from that slug, and clones the active `dashboardDocument` into a `POST /api/v1/dashboards` request.
+- `apps/web/src/App.tsx` added a `Create dashboard` composer above the directory list so operators can fork either the latest dashboard or a historical revision currently loaded in the runtime preview.
+- `apps/web/src/App.tsx` now resets the create draft from the returned dashboard payload and refreshes the directory after a successful create so the new dashboard becomes immediately selectable in the live shell.
+
+Functional result:
+- Operators can now create a brand-new persisted dashboard directly from the live shell instead of stopping at browsing and revising existing dashboards.
+- The shell supports a practical fork workflow: inspect a dashboard or older revision, then save it under a new slug as version 1 of a new dashboard.
+- The homepage moves closer to a usable dashboard service by surfacing another pre-existing backend capability as a first-class operator action.
+
+Validation:
+- `npm run build:web`
+- `POST /api/v1/dashboards` with a temporary clone of `commerce-home`, followed by `GET /api/v1/dashboards/commerce-home-live-copy` and `DELETE /api/v1/dashboards/commerce-home-live-copy`
+
 ## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
