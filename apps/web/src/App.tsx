@@ -144,6 +144,16 @@ type RuntimeNoticeFact = {
 
 type StarterRefreshOutcome = 'created' | 'refreshed' | 'aligned' | null;
 
+type StarterRefreshHistoryTone = 'success' | 'error';
+
+type StarterRefreshHistoryEntry = {
+  id: string;
+  summary: string;
+  detail: string;
+  timestampLabel: string;
+  tone: StarterRefreshHistoryTone;
+};
+
 type RuntimeCanvasScaleMode = 'fit' | 'detail';
 
 type RuntimeGridMetrics = {
@@ -646,6 +656,7 @@ function App() {
   );
   const [dashboardOwnerPrincipalKey, setDashboardOwnerPrincipalKey] = useState<string | null>(null);
   const [starterRefreshOutcome, setStarterRefreshOutcome] = useState<StarterRefreshOutcome>(null);
+  const [starterRefreshHistory, setStarterRefreshHistory] = useState<StarterRefreshHistoryEntry[]>([]);
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
   const [runtimeCanvasZoomPercent, setRuntimeCanvasZoomPercent] = useState<number>(
@@ -677,6 +688,25 @@ function App() {
     setStarterRefreshOutcome(null);
     setDashboardNotice(notice);
     setDashboardNoticeTone(tone);
+  }
+
+  function recordStarterRefreshHistory(
+    summary: string,
+    detail: string,
+    tone: StarterRefreshHistoryTone,
+  ): void {
+    const timestampLabel = dateTimeFormatter.format(new Date());
+
+    setStarterRefreshHistory((currentHistory) => [
+      {
+        id: `${Date.now()}-${currentHistory.length}`,
+        summary,
+        detail,
+        timestampLabel,
+        tone,
+      },
+      ...currentHistory,
+    ].slice(0, 4));
   }
 
   async function loadDashboardDocument(signal?: AbortSignal): Promise<void> {
@@ -760,6 +790,19 @@ function App() {
       const payload = (await response.json()) as DashboardApiResponse;
 
       applyDashboardPayload(payload);
+      const historySummary =
+        previousPersistedVersion == null
+          ? 'Created starter persistence'
+          : payload.latestVersionNumber > previousPersistedVersion
+            ? 'Refreshed starter seed'
+            : 'Starter already aligned';
+      const historyDetail =
+        previousPersistedVersion == null
+          ? `Persisted the canonical starter as version ${payload.latestVersionNumber}.`
+          : payload.latestVersionNumber > previousPersistedVersion
+            ? `Advanced the persisted starter from version ${previousPersistedVersion} to ${payload.latestVersionNumber}.`
+            : `No new version was needed; the persisted starter stayed at version ${payload.latestVersionNumber}.`;
+
       setDashboardNotice(
         previousPersistedVersion == null
           ? `Starter dashboard '${payload.slug}' is now persisted as version ${payload.latestVersionNumber}.`
@@ -774,9 +817,17 @@ function App() {
             ? 'refreshed'
             : 'aligned',
       );
+      recordStarterRefreshHistory(historySummary, historyDetail, 'success');
       setDashboardNoticeTone('success');
     } catch (error) {
       setStarterRefreshOutcome(null);
+      recordStarterRefreshHistory(
+        'Starter refresh failed',
+        error instanceof Error
+          ? error.message
+          : `Unable to refresh starter dashboard '${starterDashboard.key}'.`,
+        'error',
+      );
       setDashboardNotice(
         error instanceof Error
           ? error.message
@@ -1349,6 +1400,22 @@ function App() {
                     {formattedPersistedDashboardUpdatedAt ? ` · Updated ${formattedPersistedDashboardUpdatedAt}` : ''}
                     {dashboardOwnerPrincipalKey ? ` · Owner ${dashboardOwnerPrincipalKey}` : ''}
                   </p>
+                ) : null}
+                {starterRefreshHistory.length > 0 ? (
+                  <div className="runtimeStarterHistory" aria-label="Recent starter refresh actions">
+                    {starterRefreshHistory.map((entry) => (
+                      <article
+                        className={`runtimeStarterHistoryItem${entry.tone === 'error' ? ' runtimeStarterHistoryItemError' : ''}`}
+                        key={entry.id}
+                      >
+                        <div className="runtimeStarterHistoryHeader">
+                          <strong>{entry.summary}</strong>
+                          <span>{entry.timestampLabel}</span>
+                        </div>
+                        <p>{entry.detail}</p>
+                      </article>
+                    ))}
+                  </div>
                 ) : null}
               </div>
               <div className="runtimeControlGroup" aria-label="Starter dashboard actions">
