@@ -663,3 +663,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 554034f3 · Enrich starter action history context
+
+Intent: make the recent starter action trail more operationally useful by attaching compact persisted-dashboard context to each entry instead of relying on the summary and detail sentence alone.
+
+What changed:
+- `apps/web/src/App.tsx` extended the starter history entry shape with compact context labels and updated the session-storage hydration logic so older stored entries still load safely while newer entries preserve those labels.
+- `apps/web/src/App.tsx` now derives small history labels from the current starter dashboard context, including persisted version, version status, and owner principal key.
+- `apps/web/src/App.tsx` records those labels for both successful refresh attempts and failed refresh attempts, then renders them inline under each recent history entry.
+- `apps/web/src/styles.css` added compact pill styling for the per-entry starter context labels.
+
+Functional result:
+- Operators can now scan the recent starter action trail and immediately see which persisted version, status, and owner context each action belonged to.
+- The recent history surface carries more of the starter state on its own, which reduces the need to cross-reference the separate status metadata block.
+- Older session-stored history remains backward-compatible because missing context labels still hydrate as empty entries.
+
+Validation:
+- `npm run build:web`
