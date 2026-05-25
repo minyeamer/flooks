@@ -733,3 +733,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## d2c4cb16 · Compact starter failure history
+
+Intent: keep failed starter history entries readable inside the compact toolbar trail without losing the raw backend error text that operators still need for debugging.
+
+What changed:
+- `apps/web/src/App.tsx` extended starter history entries with an optional raw-detail field so failure entries can store both a compact visible detail line and the original error message.
+- `apps/web/src/App.tsx` now records failed refresh attempts as `Request failed. Expand raw error for details.` while preserving the full backend error message separately.
+- `apps/web/src/App.tsx` also upgrades older session-stored failure entries on hydrate by treating their existing detail line as the raw error payload and replacing the visible detail with the new compact failure summary.
+- `apps/web/src/styles.css` added a small expandable raw-error disclosure style for failed history entries.
+
+Functional result:
+- Failed starter refreshes no longer dominate the recent action trail with long raw error strings by default.
+- Operators can still expand a failed entry to inspect the exact backend error message when they need it.
+- Existing browser-session history remains backward-compatible because older failure entries are normalized into the new compact-plus-raw structure on load.
+
+Validation:
+- `npm run build:web`
