@@ -46,7 +46,7 @@ class OverviewResponse(BaseModel):
 @router.get(
     "/overview",
     response_model=OverviewResponse,
-    summary="Bootstrap overview for the live web shell",
+    summary="Web shell overview for the live runtime",
 )
 async def get_overview() -> OverviewResponse:
     api_prefix = settings.api_v1_prefix
@@ -55,11 +55,11 @@ async def get_overview() -> OverviewResponse:
     return OverviewResponse(
         product="FLooks",
         environment=settings.env,
-        headline="Bootstrap slice is live",
+        headline="FLooks web shell is live",
         summary=(
-            "The web shell now has a live API surface for roadmap, readiness, service links, "
-            "human-readable API reference data, dashboard CRUD/versioning, and governed query "
-            "validation/execution while the identity and metadata layers stay live."
+            "The web shell now exposes live runtime status, starter dashboard operations, "
+            "structured API reference data, dashboard CRUD/versioning, and governed query "
+            "validation/execution on top of the running backend surfaces."
         ),
         metrics=[
             OverviewMetric(
@@ -191,7 +191,7 @@ async def get_overview() -> OverviewResponse:
             ServiceLink(
                 label="Overview",
                 href=f"{api_prefix}/overview",
-                description="Live bootstrap payload consumed by the web shell.",
+                description="Live web-shell payload consumed by the runtime homepage.",
             ),
             ServiceLink(
                 label="OpenAPI",

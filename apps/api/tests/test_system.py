@@ -37,6 +37,8 @@ def test_overview() -> None:
 
     assert payload["product"] == "FLooks"
     assert payload["environment"] == "development"
+    assert payload["headline"] == "FLooks web shell is live"
+    assert "starter dashboard operations" in payload["summary"]
     assert any(metric["label"] == "Metadata tables" and metric["value"] == "4" for metric in payload["metrics"])
     assert any(metric["label"] == "Governed datasets" and metric["value"] == "2" for metric in payload["metrics"])
     assert any(metric["label"] == "Live endpoints" and metric["value"] == "16" for metric in payload["metrics"])

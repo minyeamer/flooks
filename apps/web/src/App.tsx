@@ -560,7 +560,7 @@ function isNoticePanel(panel: PanelRef | undefined): panel is PanelRef & { kind:
 
 const launchTracks = [
   {
-    title: 'Live Bootstrap Surface',
+    title: 'Live Runtime Surface',
     body: '웹 셸이 이제 실제 API 응답을 읽어 실행 상태, 다음 구현 순서, 접근 가능한 엔드포인트를 바로 보여줍니다.',
   },
   {
@@ -1607,7 +1607,7 @@ function App() {
           {errorMessage ? <p className="inlineNotice">{errorMessage}</p> : null}
         </div>
         <div className="heroCard">
-          <span className="heroCardLabel">Live Bootstrap</span>
+          <span className="heroCardLabel">Live Shell</span>
           <strong>{overview?.product ?? dashboardDocument.title}</strong>
           <span>
             {overview
@@ -1641,7 +1641,7 @@ function App() {
         <section className="panel panelWide">
           <div className="panelHeader">
             <span className="chip">Live API</span>
-            <h2>Bootstrap runtime overview</h2>
+            <h2>Runtime overview</h2>
           </div>
           {overview ? (
             <div className="metricGrid">
@@ -1657,7 +1657,7 @@ function App() {
             <p className={`callout ${requestState === 'error' ? 'calloutError' : ''}`}>
               {requestState === 'error'
                 ? 'The API is not reachable yet. Bring up the compose stack to populate the live overview.'
-                : `Loading live bootstrap data from ${API_BASE_URL}`}
+                : `Loading live runtime data from ${API_BASE_URL}`}
             </p>
           )}
         </section>
@@ -1740,7 +1740,7 @@ function App() {
         <section className="panel panelWide">
           <div className="panelHeader">
             <span className="chip">API Reference</span>
-            <h2>{apiReference?.title ?? 'Bootstrap API reference'}</h2>
+            <h2>{apiReference?.title ?? 'FLooks API reference'}</h2>
             <p className="sectionSummary">
               {apiReference?.summary ?? 'The API reference panel will appear once the structured reference endpoint responds.'}
             </p>
