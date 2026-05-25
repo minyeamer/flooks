@@ -722,6 +722,7 @@ function App() {
   const [starterRefreshHistory, setStarterRefreshHistory] = useState<StarterRefreshHistoryEntry[]>(() =>
     loadStarterRefreshHistory(),
   );
+  const [isClearStarterHistoryArmed, setIsClearStarterHistoryArmed] = useState<boolean>(false);
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
   const [runtimeCanvasZoomPercent, setRuntimeCanvasZoomPercent] = useState<number>(
@@ -775,10 +776,20 @@ function App() {
   }
 
   function clearStarterRefreshHistory(): void {
+    setIsClearStarterHistoryArmed(false);
     setStarterRefreshHistory([]);
     setStarterRefreshOutcome(null);
     setDashboardNotice('Cleared recent starter actions for this browser session.');
     setDashboardNoticeTone('default');
+  }
+
+  function handleClearStarterRefreshHistory(): void {
+    if (!isClearStarterHistoryArmed) {
+      setIsClearStarterHistoryArmed(true);
+      return;
+    }
+
+    clearStarterRefreshHistory();
   }
 
   async function loadDashboardDocument(signal?: AbortSignal): Promise<void> {
@@ -836,6 +847,7 @@ function App() {
     const previousPersistedVersion = persistedDashboardVersion;
 
     try {
+      setIsClearStarterHistoryArmed(false);
       setIsRefreshingStarterDashboard(true);
       setDashboardNotice(null);
       setDashboardNoticeTone('default');
@@ -1020,6 +1032,10 @@ function App() {
   }, [starterRefreshHistory]);
 
   useEffect(() => {
+    setIsClearStarterHistoryArmed(false);
+  }, [starterRefreshHistory]);
+
+  useEffect(() => {
     setActivePageId((currentPageId) => {
       if (
         currentPageId != null &&
@@ -1132,7 +1148,9 @@ function App() {
   const isClearStarterHistoryDisabled =
     isRefreshingStarterDashboard || starterRefreshHistory.length === 0;
   const clearStarterHistoryTitle =
-    starterRefreshHistory.length > 0
+    isClearStarterHistoryArmed
+      ? 'Click again to clear recent starter actions saved for this browser session'
+      : starterRefreshHistory.length > 0
       ? 'Clear recent starter actions saved for this browser session'
       : 'No recent starter actions saved for this browser session';
   const formattedPersistedDashboardUpdatedAt =
@@ -1518,12 +1536,12 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className="runtimeControl"
+                  className={`runtimeControl${isClearStarterHistoryArmed ? ' runtimeControlActive' : ''}`}
                   disabled={isClearStarterHistoryDisabled}
-                  onClick={clearStarterRefreshHistory}
+                  onClick={handleClearStarterRefreshHistory}
                   title={clearStarterHistoryTitle}
                 >
-                  Clear history
+                  {isClearStarterHistoryArmed ? 'Confirm clear' : 'Clear history'}
                 </button>
               </div>
               <div className="runtimeControlGroup" aria-label="Runtime canvas view mode">
