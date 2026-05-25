@@ -681,3 +681,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## d7302b84 · Badge starter action history
+
+Intent: make the recent starter action trail easier to scan by separating the action category from the freeform summary line and rendering it as an explicit visual badge.
+
+What changed:
+- `apps/web/src/App.tsx` introduced an explicit starter history action-kind field for `created`, `refreshed`, `aligned`, and `failed` entries.
+- `apps/web/src/App.tsx` now infers that action kind when older session-stored entries are missing the field, which keeps the existing browser-session history backward-compatible.
+- `apps/web/src/App.tsx` records the action kind for new refresh success and failure entries, then renders a dedicated badge next to each recent history summary.
+- `apps/web/src/styles.css` added compact inline badge styling and action-specific color variants for created, refreshed, aligned, and failed history entries.
+
+Functional result:
+- Operators can now distinguish starter creates, real refreshes, no-op alignment checks, and failures at a glance without parsing the whole summary sentence.
+- Older browser-session history continues to load because action kinds are inferred when they were not stored yet.
+- The recent history surface now separates status category from supporting detail, which makes the trail faster to scan during repeated starter operations.
+
+Validation:
+- `npm run build:web`
