@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type KeyboardEvent, type WheelEvent } from 'react';
 
 import {
   dataSourceKinds,
@@ -308,6 +308,15 @@ function clampRuntimeCanvasZoomPercent(zoomPercent: number): number {
   );
 }
 
+function getNextRuntimeCanvasZoomPercent(
+  currentZoomPercent: number,
+  direction: 'in' | 'out',
+): number {
+  return clampRuntimeCanvasZoomPercent(
+    currentZoomPercent + (direction === 'in' ? runtimeCanvasZoomPercentStep : -runtimeCanvasZoomPercentStep),
+  );
+}
+
 function getRuntimeCanvasScaleFactor(
   scaleMode: RuntimeCanvasScaleMode,
   zoomPercent: number,
@@ -500,6 +509,49 @@ function App() {
   );
   const [requestState, setRequestState] = useState<RequestState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  function resetRuntimeCanvasView(): void {
+    setRuntimeCanvasScaleMode('fit');
+    setRuntimeCanvasZoomPercent(runtimeCanvasZoomPercentDefault);
+  }
+
+  function stepRuntimeCanvasZoom(direction: 'in' | 'out'): void {
+    setRuntimeCanvasZoomPercent((currentZoomPercent) =>
+      getNextRuntimeCanvasZoomPercent(currentZoomPercent, direction),
+    );
+  }
+
+  function handleRuntimeCanvasKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.defaultPrevented) {
+      return;
+    }
+
+    if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      stepRuntimeCanvasZoom('in');
+      return;
+    }
+
+    if (event.key === '-') {
+      event.preventDefault();
+      stepRuntimeCanvasZoom('out');
+      return;
+    }
+
+    if (event.key === '0') {
+      event.preventDefault();
+      resetRuntimeCanvasView();
+    }
+  }
+
+  function handleRuntimeCanvasWheel(event: WheelEvent<HTMLDivElement>): void {
+    if (!event.altKey) {
+      return;
+    }
+
+    event.preventDefault();
+    stepRuntimeCanvasZoom(event.deltaY < 0 ? 'in' : 'out');
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1037,13 +1089,7 @@ function App() {
                   type="button"
                   className="runtimeControl"
                   disabled={isRuntimeCanvasZoomOutDisabled}
-                  onClick={() =>
-                    setRuntimeCanvasZoomPercent((currentZoomPercent) =>
-                      clampRuntimeCanvasZoomPercent(
-                        currentZoomPercent - runtimeCanvasZoomPercentStep,
-                      ),
-                    )
-                  }
+                  onClick={() => stepRuntimeCanvasZoom('out')}
                   title="Zoom out runtime canvas"
                 >
                   -
@@ -1051,10 +1097,7 @@ function App() {
                 <button
                   type="button"
                   className={`runtimeControl${isRuntimeCanvasDefaultView ? ' runtimeControlActive' : ''}`}
-                  onClick={() => {
-                    setRuntimeCanvasScaleMode('fit');
-                    setRuntimeCanvasZoomPercent(runtimeCanvasZoomPercentDefault);
-                  }}
+                  onClick={resetRuntimeCanvasView}
                   title="Reset runtime canvas view"
                 >
                   Reset
@@ -1063,13 +1106,7 @@ function App() {
                   type="button"
                   className="runtimeControl"
                   disabled={isRuntimeCanvasZoomInDisabled}
-                  onClick={() =>
-                    setRuntimeCanvasZoomPercent((currentZoomPercent) =>
-                      clampRuntimeCanvasZoomPercent(
-                        currentZoomPercent + runtimeCanvasZoomPercentStep,
-                      ),
-                    )
-                  }
+                  onClick={() => stepRuntimeCanvasZoom('in')}
                   title="Zoom in runtime canvas"
                 >
                   +
@@ -1106,7 +1143,14 @@ function App() {
                     View: {runtimeCanvasScaleModes.find((mode) => mode.id === runtimeCanvasScaleMode)?.label} · Zoom {runtimeCanvasZoomLabel}
                   </p>
                 </div>
-                <div className="runtimeCanvasScroller">
+                <p className="runtimeMeta">Shortcuts: + zoom in, - zoom out, 0 reset, Alt + wheel zoom.</p>
+                <div
+                  className="runtimeCanvasScroller"
+                  aria-label="Runtime canvas preview"
+                  onKeyDown={handleRuntimeCanvasKeyDown}
+                  onWheel={handleRuntimeCanvasWheel}
+                  tabIndex={0}
+                >
                   <div className="runtimePanelList runtimeCanvas" style={runtimeCanvasStyle}>
                     {dashboardRuntimePanelEntries.map(({ panel, placement }) => {
                       const runtime = panelRuntime[panel.id];
