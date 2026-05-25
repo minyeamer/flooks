@@ -646,3 +646,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## a95f05cd · Timeout clear history confirmation
+
+Intent: make the armed clear-history state safer and less sticky by automatically collapsing the destructive confirmation after a short idle window.
+
+What changed:
+- `apps/web/src/App.tsx` introduced a small confirmation timeout constant for the clear-history control and an effect that automatically disarms the pending confirmation state after a short delay.
+- `apps/web/src/App.tsx` now updates the clear-history tooltip to explain that the second confirmation click must happen within the timeout window.
+- `apps/web/src/App.tsx` also updates the armed button label to show the short-lived confirmation window directly in the control itself.
+
+Functional result:
+- Operators no longer have to worry about leaving the destructive clear-history action armed indefinitely while they continue using the runtime shell.
+- The clear-history interaction still stays lightweight and inline, but the shell now automatically reverts it to the safer idle state after a few seconds.
+- The button itself now makes the temporary confirmation window visible, which reduces ambiguity around how long the armed state lasts.
+
+Validation:
+- `npm run build:web`
