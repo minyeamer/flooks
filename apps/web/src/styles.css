@@ -646,6 +646,30 @@ h1 {
   margin: 0;
 }
 
+.runtimeStarterHistoryErrorDetails {
+  margin-top: 8px;
+}
+
+.runtimeStarterHistoryErrorSummary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.runtimeStarterHistoryErrorSummary::-webkit-details-marker {
+  display: none;
+}
+
+.runtimeStarterHistoryErrorMessage {
+  margin: 6px 0 0;
+  color: #9a3412;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
 .runtimeStarterHistoryLabels {
   display: flex;
   flex-wrap: wrap;

@@ -152,6 +152,7 @@ type StarterRefreshHistoryEntry = {
   id: string;
   summary: string;
   detail: string;
+  rawDetail: string | null;
   timestampLabel: string;
   tone: StarterRefreshHistoryTone;
   actionKind: StarterRefreshHistoryKind | null;
@@ -305,6 +306,15 @@ function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
           const contextLabels = rawContextLabels
             .filter((label): label is string => typeof label === 'string')
             .slice(0, 3);
+          const rawDetailValue = 'rawDetail' in entry ? entry.rawDetail : undefined;
+          const rawDetail =
+            typeof rawDetailValue === 'string'
+              ? rawDetailValue
+              : rawDetailValue === null
+                ? null
+                : entry.tone === 'error'
+                  ? entry.detail
+                  : null;
           const actionKind =
             'actionKind' in entry &&
             (entry.actionKind === 'created' ||
@@ -318,7 +328,11 @@ function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
             {
               id: entry.id,
               summary: entry.summary,
-              detail: entry.detail,
+              detail:
+                entry.tone === 'error' && rawDetail != null
+                  ? 'Request failed. Expand raw error for details.'
+                  : entry.detail,
+              rawDetail,
               timestampLabel: entry.timestampLabel,
               tone: entry.tone,
               actionKind,
@@ -868,6 +882,7 @@ function App() {
     tone: StarterRefreshHistoryTone,
     actionKind: StarterRefreshHistoryKind | null,
     contextLabels: string[] = [],
+    rawDetail: string | null = null,
   ): void {
     const timestampLabel = dateTimeFormatter.format(new Date());
 
@@ -876,6 +891,7 @@ function App() {
         id: `${Date.now()}-${currentHistory.length}`,
         summary,
         detail,
+        rawDetail,
         timestampLabel,
         tone,
         actionKind,
@@ -1025,12 +1041,15 @@ function App() {
       );
       setDashboardNoticeTone('success');
     } catch (error) {
+      const refreshErrorMessage =
+        error instanceof Error
+          ? error.message
+          : `Unable to refresh starter dashboard '${starterDashboard.key}'.`;
+
       setStarterRefreshOutcome(null);
       recordStarterRefreshHistory(
         getStarterRefreshHistorySummary('failed'),
-        error instanceof Error
-          ? error.message
-          : `Unable to refresh starter dashboard '${starterDashboard.key}'.`,
+        'Request failed. Expand raw error for details.',
         'error',
         'failed',
         buildStarterRefreshHistoryContextLabels({
@@ -1038,11 +1057,10 @@ function App() {
           versionStatus: persistedDashboardVersionStatus,
           ownerPrincipalKey: dashboardOwnerPrincipalKey,
         }),
+        refreshErrorMessage,
       );
       setDashboardNotice(
-        error instanceof Error
-          ? error.message
-          : `Unable to refresh starter dashboard '${starterDashboard.key}'.`,
+        refreshErrorMessage,
       );
       setDashboardNoticeTone('error');
     } finally {
@@ -1667,6 +1685,12 @@ function App() {
                           <span>{entry.timestampLabel}</span>
                         </div>
                         <p>{entry.detail}</p>
+                        {entry.rawDetail != null ? (
+                          <details className="runtimeStarterHistoryErrorDetails">
+                            <summary className="runtimeStarterHistoryErrorSummary">Raw error</summary>
+                            <p className="runtimeStarterHistoryErrorMessage">{entry.rawDetail}</p>
+                          </details>
+                        ) : null}
                         {entry.contextLabels.length > 0 ? (
                           <div className="runtimeStarterHistoryLabels" aria-label="Starter action context">
                             {entry.contextLabels.map((label) => (
