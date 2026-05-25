@@ -942,3 +942,22 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## fd4fc7e5 · Add dashboard directory
+
+Intent: move the web shell closer to a real dashboard service by listing persisted dashboards from the metadata store and letting operators switch the live runtime preview between them.
+
+What changed:
+- `apps/web/src/App.tsx` added dashboard-directory state, loading, and error handling for `GET /api/v1/dashboards`, plus selection state for the currently loaded dashboard slug.
+- `apps/web/src/App.tsx` now loads the selected dashboard document by slug instead of always fetching the canonical starter dashboard, and it refreshes the directory after starter-refresh mutations so version metadata stays current.
+- `apps/web/src/App.tsx` renders a new `Dashboard Directory` section with selectable dashboard cards and adds a matching hero jump action.
+- `apps/web/src/App.tsx` also hides starter-specific refresh/history controls when the loaded dashboard is not the canonical starter so the runtime toolbar stays semantically correct.
+- `apps/web/src/styles.css` added dashboard-directory card layouts and responsive styling for the new selection surface.
+
+Functional result:
+- The homepage now behaves more like a dashboard application by exposing the current dashboard inventory from the backend instead of silently locking the runtime preview to one hardcoded slug.
+- Operators can switch the live runtime preview between persisted dashboards without changing code or editing URLs.
+- Starter-specific controls no longer leak into non-starter dashboards, which keeps the runtime surface coherent when browsing other persisted assets.
+
+Validation:
+- `npm run build:web`
