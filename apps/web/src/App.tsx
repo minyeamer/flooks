@@ -774,6 +774,13 @@ function App() {
     ].slice(0, 4));
   }
 
+  function clearStarterRefreshHistory(): void {
+    setStarterRefreshHistory([]);
+    setStarterRefreshOutcome(null);
+    setDashboardNotice('Cleared recent starter actions for this browser session.');
+    setDashboardNoticeTone('default');
+  }
+
   async function loadDashboardDocument(signal?: AbortSignal): Promise<void> {
     try {
       setDashboardNotice(null);
@@ -1122,6 +1129,12 @@ function App() {
   const refreshStarterTitle = isUserManagedStarterDashboard
     ? 'User-managed starter dashboards cannot be refreshed from the canonical seed.'
     : 'Create or refresh the canonical starter dashboard';
+  const isClearStarterHistoryDisabled =
+    isRefreshingStarterDashboard || starterRefreshHistory.length === 0;
+  const clearStarterHistoryTitle =
+    starterRefreshHistory.length > 0
+      ? 'Clear recent starter actions saved for this browser session'
+      : 'No recent starter actions saved for this browser session';
   const formattedPersistedDashboardUpdatedAt =
     persistedDashboardUpdatedAt != null
       ? dateTimeFormatter.format(new Date(persistedDashboardUpdatedAt))
@@ -1502,6 +1515,15 @@ function App() {
                   title={refreshStarterTitle}
                 >
                   {isRefreshingStarterDashboard ? 'Refreshing starter...' : 'Refresh starter'}
+                </button>
+                <button
+                  type="button"
+                  className="runtimeControl"
+                  disabled={isClearStarterHistoryDisabled}
+                  onClick={clearStarterRefreshHistory}
+                  title={clearStarterHistoryTitle}
+                >
+                  Clear history
                 </button>
               </div>
               <div className="runtimeControlGroup" aria-label="Runtime canvas view mode">
