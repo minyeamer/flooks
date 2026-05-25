@@ -98,7 +98,9 @@ type DashboardApiResponse = {
   slug: string;
   title: string;
   latestVersionNumber: number;
+  latestVersionStatus: 'draft' | 'published' | 'archived';
   ownerPrincipalKey: string;
+  updatedAt: string;
   document: DashboardDocument;
 };
 
@@ -140,6 +142,8 @@ type RuntimeNoticeFact = {
   value: string;
 };
 
+type StarterRefreshOutcome = 'created' | 'refreshed' | 'aligned' | null;
+
 type RuntimeCanvasScaleMode = 'fit' | 'detail';
 
 type RuntimeGridMetrics = {
@@ -162,6 +166,10 @@ type RuntimeGridStyle = CSSProperties & {
 };
 
 const numberFormatter = new Intl.NumberFormat('en-US');
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
 
 const runtimeCanvasScaleModes: Array<{
   id: RuntimeCanvasScaleMode;
@@ -632,7 +640,12 @@ function App() {
   const [dashboardNotice, setDashboardNotice] = useState<string | null>(null);
   const [dashboardNoticeTone, setDashboardNoticeTone] = useState<'default' | 'error' | 'success'>('default');
   const [persistedDashboardVersion, setPersistedDashboardVersion] = useState<number | null>(null);
+  const [persistedDashboardUpdatedAt, setPersistedDashboardUpdatedAt] = useState<string | null>(null);
+  const [persistedDashboardVersionStatus, setPersistedDashboardVersionStatus] = useState<string | null>(
+    null,
+  );
   const [dashboardOwnerPrincipalKey, setDashboardOwnerPrincipalKey] = useState<string | null>(null);
+  const [starterRefreshOutcome, setStarterRefreshOutcome] = useState<StarterRefreshOutcome>(null);
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
   const [runtimeCanvasZoomPercent, setRuntimeCanvasZoomPercent] = useState<number>(
@@ -649,6 +662,8 @@ function App() {
     setDashboardDocument(payload.document);
     setDashboardSourceLabel(`Persisted v${payload.latestVersionNumber}`);
     setPersistedDashboardVersion(payload.latestVersionNumber);
+    setPersistedDashboardUpdatedAt(payload.updatedAt);
+    setPersistedDashboardVersionStatus(payload.latestVersionStatus);
     setDashboardOwnerPrincipalKey(payload.ownerPrincipalKey);
   }
 
@@ -656,7 +671,10 @@ function App() {
     setDashboardDocument(starterDashboard);
     setDashboardSourceLabel('Starter seed');
     setPersistedDashboardVersion(null);
+    setPersistedDashboardUpdatedAt(null);
+    setPersistedDashboardVersionStatus(null);
     setDashboardOwnerPrincipalKey(null);
+    setStarterRefreshOutcome(null);
     setDashboardNotice(notice);
     setDashboardNoticeTone(tone);
   }
@@ -749,8 +767,16 @@ function App() {
             ? `Starter dashboard '${payload.slug}' refreshed to persisted version ${payload.latestVersionNumber}.`
             : `Starter dashboard '${payload.slug}' is already aligned at persisted version ${payload.latestVersionNumber}.`,
       );
+      setStarterRefreshOutcome(
+        previousPersistedVersion == null
+          ? 'created'
+          : payload.latestVersionNumber > previousPersistedVersion
+            ? 'refreshed'
+            : 'aligned',
+      );
       setDashboardNoticeTone('success');
     } catch (error) {
+      setStarterRefreshOutcome(null);
       setDashboardNotice(
         error instanceof Error
           ? error.message
@@ -976,6 +1002,18 @@ function App() {
   const refreshStarterTitle = isUserManagedStarterDashboard
     ? 'User-managed starter dashboards cannot be refreshed from the canonical seed.'
     : 'Create or refresh the canonical starter dashboard';
+  const formattedPersistedDashboardUpdatedAt =
+    persistedDashboardUpdatedAt != null
+      ? dateTimeFormatter.format(new Date(persistedDashboardUpdatedAt))
+      : null;
+  const starterRefreshOutcomeLabel =
+    starterRefreshOutcome === 'created'
+      ? 'Created'
+      : starterRefreshOutcome === 'refreshed'
+        ? 'Refreshed'
+        : starterRefreshOutcome === 'aligned'
+          ? 'Already aligned'
+          : null;
   const runtimeGridMetrics = activeDashboardPage ? getRuntimeGridMetrics(activeDashboardPage) : null;
   const runtimeCanvasScaleFactor = getRuntimeCanvasScaleFactor(
     runtimeCanvasScaleMode,
@@ -1290,12 +1328,28 @@ function App() {
                 </p>
               ) : null}
               <div className="runtimeStarterStatus">
-                <span
-                  className={`runtimeStatusPill${isUserManagedStarterDashboard ? ' runtimeStatusPillProtected' : isPersistedStarterDashboard ? ' runtimeStatusPillManaged' : ''}`}
-                >
-                  Starter: {starterDashboardStatusLabel}
-                </span>
+                <div className="runtimeStarterStatusHeader">
+                  <span
+                    className={`runtimeStatusPill${isUserManagedStarterDashboard ? ' runtimeStatusPillProtected' : isPersistedStarterDashboard ? ' runtimeStatusPillManaged' : ''}`}
+                  >
+                    Starter: {starterDashboardStatusLabel}
+                  </span>
+                  {starterRefreshOutcomeLabel ? (
+                    <span className="runtimeStatusPill runtimeStatusPillOutcome">
+                      Last action: {starterRefreshOutcomeLabel}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="runtimeMeta">{starterDashboardStatusMessage}</p>
+                {isPersistedStarterDashboard ? (
+                  <p className="runtimeMeta">
+                    {persistedDashboardVersionStatus != null
+                      ? `Version status: ${persistedDashboardVersionStatus}`
+                      : 'Version status unavailable'}
+                    {formattedPersistedDashboardUpdatedAt ? ` · Updated ${formattedPersistedDashboardUpdatedAt}` : ''}
+                    {dashboardOwnerPrincipalKey ? ` · Owner ${dashboardOwnerPrincipalKey}` : ''}
+                  </p>
+                ) : null}
               </div>
               <div className="runtimeControlGroup" aria-label="Starter dashboard actions">
                 <button

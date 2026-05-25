@@ -500,6 +500,13 @@ h1 {
   gap: 6px;
 }
 
+.runtimeStarterStatusHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .runtimeStatusPill {
   display: inline-flex;
   align-items: center;
@@ -525,6 +532,12 @@ h1 {
   border-color: rgba(154, 52, 18, 0.18);
   background: rgba(154, 52, 18, 0.08);
   color: #9a3412;
+}
+
+.runtimeStatusPillOutcome {
+  border-color: rgba(24, 34, 45, 0.08);
+  background: rgba(24, 34, 45, 0.06);
+  color: var(--ink);
 }
 
 .runtimeControlGroup {
