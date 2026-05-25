@@ -1586,6 +1586,9 @@ function App() {
   const isRuntimeCanvasZoomInDisabled = runtimeCanvasZoomPercent >= runtimeCanvasZoomPercentMax;
   const isRuntimeCanvasDefaultView =
     runtimeCanvasScaleMode === 'fit' && runtimeCanvasZoomPercent === runtimeCanvasZoomPercentDefault;
+  const runtimePreviewLabel = activeDashboardPage
+    ? `${activeDashboardPage.title} · ${dashboardRuntimePanelEntries.length} live panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`
+    : `${dashboardRuntimePanelEntries.length} live runtime panel${dashboardRuntimePanelEntries.length === 1 ? '' : 's'}`;
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
   const heroSummary =
     overview?.summary ??
@@ -1604,11 +1607,20 @@ function App() {
               {system ? `${system.name} · ${system.environment} · v${system.version}` : API_BASE_URL}
             </span>
           </div>
+          <div className="heroActions" aria-label="Jump to live shell sections">
+            <a className="heroAction heroActionPrimary" href="#live-dashboard-runtime">
+              Open live dashboard preview
+            </a>
+            <a className="heroAction" href="#api-reference">
+              Browse API reference
+            </a>
+          </div>
           {errorMessage ? <p className="inlineNotice">{errorMessage}</p> : null}
         </div>
         <div className="heroCard">
           <span className="heroCardLabel">Live Shell</span>
           <strong>{overview?.product ?? dashboardDocument.title}</strong>
+          <span>{runtimePreviewLabel}</span>
           <span>
             {overview
               ? `${overview.metrics.length} live metrics · ${overview.execution_plan.length} planned slices`
@@ -1737,7 +1749,7 @@ function App() {
           )}
         </section>
 
-        <section className="panel panelWide">
+        <section className="panel panelWide" id="api-reference">
           <div className="panelHeader">
             <span className="chip">API Reference</span>
             <h2>{apiReference?.title ?? 'FLooks API reference'}</h2>
@@ -1864,10 +1876,10 @@ function App() {
           )}
         </section>
 
-        <section className="panel panelWide">
+        <section className="panel panelWide" id="live-dashboard-runtime">
           <div className="panelHeader">
-            <span className="chip">Live Panel Runtime</span>
-            <h2>Active dashboard page preview</h2>
+            <span className="chip">Dashboard Runtime</span>
+            <h2>Live dashboard preview</h2>
             <p className="sectionSummary">
               The web shell reads first-party panel definitions from the active dashboard page,
               preserves their placement order, and executes each supported panel through the live
