@@ -214,6 +214,7 @@ const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f
 const starterDashboardBootstrapOwnerKey = 'system-bootstrap';
 const starterRefreshHistoryStorageKey = 'flooks.starter-refresh-history';
 const starterRefreshHistoryFilterStorageKey = 'flooks.starter-refresh-history-filter';
+const starterRefreshHistoryOpenErrorsStorageKey = 'flooks.starter-refresh-history-open-errors';
 
 function inferStarterRefreshHistoryKind(
   summary: string,
@@ -298,6 +299,34 @@ function loadStarterRefreshHistoryFilter(): StarterRefreshHistoryFilter {
   }
 
   return 'all';
+}
+
+function loadStarterRefreshHistoryOpenErrors(): string[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const savedOpenErrors = window.sessionStorage.getItem(
+      starterRefreshHistoryOpenErrorsStorageKey,
+    );
+
+    if (savedOpenErrors == null) {
+      return [];
+    }
+
+    const parsedOpenErrors = JSON.parse(savedOpenErrors) as unknown;
+
+    if (!Array.isArray(parsedOpenErrors)) {
+      return [];
+    }
+
+    return parsedOpenErrors
+      .filter((entryId): entryId is string => typeof entryId === 'string')
+      .slice(0, 4);
+  } catch {
+    return [];
+  }
 }
 
 function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
@@ -435,6 +464,26 @@ function persistStarterRefreshHistoryFilter(filter: StarterRefreshHistoryFilter)
     }
 
     window.sessionStorage.setItem(starterRefreshHistoryFilterStorageKey, filter);
+  } catch {
+    return;
+  }
+}
+
+function persistStarterRefreshHistoryOpenErrors(openEntryIds: string[]): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (openEntryIds.length === 0) {
+      window.sessionStorage.removeItem(starterRefreshHistoryOpenErrorsStorageKey);
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      starterRefreshHistoryOpenErrorsStorageKey,
+      JSON.stringify(openEntryIds),
+    );
   } catch {
     return;
   }
@@ -896,6 +945,9 @@ function App() {
   );
   const [starterRefreshHistoryFilter, setStarterRefreshHistoryFilter] =
     useState<StarterRefreshHistoryFilter>(() => loadStarterRefreshHistoryFilter());
+  const [openStarterRefreshHistoryErrors, setOpenStarterRefreshHistoryErrors] = useState<string[]>(
+    () => loadStarterRefreshHistoryOpenErrors(),
+  );
   const [isClearStarterHistoryArmed, setIsClearStarterHistoryArmed] = useState<boolean>(false);
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
@@ -970,6 +1022,16 @@ function App() {
     }
 
     clearStarterRefreshHistory();
+  }
+
+  function setStarterRefreshHistoryErrorOpenState(entryId: string, isOpen: boolean): void {
+    setOpenStarterRefreshHistoryErrors((currentOpenEntryIds) => {
+      if (isOpen) {
+        return Array.from(new Set([...currentOpenEntryIds, entryId]));
+      }
+
+      return currentOpenEntryIds.filter((currentEntryId) => currentEntryId !== entryId);
+    });
   }
 
   async function loadDashboardDocument(signal?: AbortSignal): Promise<void> {
@@ -1235,6 +1297,10 @@ function App() {
   }, [starterRefreshHistoryFilter]);
 
   useEffect(() => {
+    persistStarterRefreshHistoryOpenErrors(openStarterRefreshHistoryErrors);
+  }, [openStarterRefreshHistoryErrors]);
+
+  useEffect(() => {
     if (!isClearStarterHistoryArmed) {
       return;
     }
@@ -1250,6 +1316,24 @@ function App() {
 
   useEffect(() => {
     setIsClearStarterHistoryArmed(false);
+  }, [starterRefreshHistory]);
+
+  useEffect(() => {
+    const validOpenEntryIds = new Set(
+      starterRefreshHistory
+        .filter((entry) => entry.rawDetail != null)
+        .map((entry) => entry.id),
+    );
+
+    setOpenStarterRefreshHistoryErrors((currentOpenEntryIds) => {
+      const nextOpenEntryIds = currentOpenEntryIds.filter((entryId) =>
+        validOpenEntryIds.has(entryId),
+      );
+
+      return nextOpenEntryIds.length === currentOpenEntryIds.length
+        ? currentOpenEntryIds
+        : nextOpenEntryIds;
+    });
   }, [starterRefreshHistory]);
 
   useEffect(() => {
@@ -1829,7 +1913,16 @@ function App() {
                           </div>
                           <p>{entry.detail}</p>
                           {entry.rawDetail != null ? (
-                            <details className="runtimeStarterHistoryErrorDetails">
+                            <details
+                              className="runtimeStarterHistoryErrorDetails"
+                              onToggle={(event) => {
+                                setStarterRefreshHistoryErrorOpenState(
+                                  entry.id,
+                                  event.currentTarget.open,
+                                );
+                              }}
+                              open={openStarterRefreshHistoryErrors.includes(entry.id)}
+                            >
                               <summary className="runtimeStarterHistoryErrorSummary">Raw error</summary>
                               <p className="runtimeStarterHistoryErrorMessage">{entry.rawDetail}</p>
                             </details>
