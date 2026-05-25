@@ -485,3 +485,21 @@ Functional result:
 Validation:
 - `npm run build:web`
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
+
+## fe3140d5 · Refresh legacy starter dashboard seed
+
+Intent: make the richer starter dashboard seed actually appear for existing bootstrap environments without overwriting starter dashboards that users have already taken over.
+
+What changed:
+- `apps/api/app/api/routes/dashboards.py` changed the starter seeding helper so it now looks for an existing `commerce-home` record before deciding whether to seed, skip, or refresh the starter dashboard.
+- `apps/api/app/api/routes/dashboards.py` added an auto-managed starter check that only refreshes starter histories whose versions were all created by `system-bootstrap` with known bootstrap summaries, which prevents the API from overwriting user-managed starter dashboards.
+- `apps/api/app/api/routes/dashboards.py` also appends a new starter dashboard revision when the stored auto-managed starter document no longer matches the current canonical seed, preserving the older bootstrap revision as version history instead of mutating it in place.
+- `apps/api/tests/test_dashboards.py` added focused coverage for both sides of the guard: legacy auto-managed starter dashboards now refresh to the mixed-panel seed, while user-managed legacy starter dashboards remain unchanged.
+
+Functional result:
+- Existing environments that still have the original system-bootstrap starter dashboard can now pick up the newer mixed-panel starter document automatically.
+- The refresh path is conservative because it only touches starter histories that are still fully bootstrap-managed.
+- Older starter revisions remain queryable through the versioned dashboard API, so the automatic refresh does not erase the original stored document.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
