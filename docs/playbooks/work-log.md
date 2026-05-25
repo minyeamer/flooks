@@ -961,3 +961,23 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 4119ae45 · Browse dashboard versions
+
+Intent: let operators browse persisted dashboard revisions in the live runtime preview while also fixing the Postgres enum mismatch that was breaking the dashboard list/detail APIs in the Compose environment.
+
+What changed:
+- `apps/api/app/db/models.py` now configures SQLAlchemy enum columns to persist `StrEnum` values instead of enum member names, aligning the ORM with the lowercase Postgres enum types created by Alembic.
+- `apps/web/src/App.tsx` expanded the dashboard response model to include version summaries, tracks the selected dashboard version, and loads `GET /api/v1/dashboards/{slug}?version=...` when the operator chooses a historical revision.
+- `apps/web/src/App.tsx` renders a new version history surface under the dashboard directory so operators can switch between `latest` and older persisted revisions without leaving the live shell.
+- `apps/web/src/styles.css` added version-history summary styling that reuses the existing application-shell interaction pattern.
+
+Functional result:
+- The Compose-backed API no longer returns `500` for dashboard list/detail requests when the starter dashboard is seeded into Postgres.
+- Operators can now inspect older persisted dashboard revisions in the same live runtime preview instead of only seeing the latest dashboard document.
+- The web shell moves closer to a real dashboard service by supporting both dashboard selection and revision browsing from the main page.
+
+Validation:
+- `curl -i -s http://localhost:8000/api/v1/dashboards | head -n 40`
+- `curl -i -s http://localhost:8000/api/v1/dashboards/commerce-home | head -n 60`
+- `npm run build:web`
