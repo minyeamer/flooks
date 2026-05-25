@@ -558,3 +558,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 57f45a74 · Starter refresh result details
+
+Intent: make the starter refresh surface more operationally useful by showing the current persisted starter metadata and the outcome of the last refresh action directly in the runtime toolbar.
+
+What changed:
+- `apps/web/src/App.tsx` expanded the dashboard response typing and local state so the shell now keeps the persisted starter `updatedAt` timestamp and latest version status in addition to version number and owner key.
+- `apps/web/src/App.tsx` added derived toolbar metadata that shows the persisted starter version status, last update time, and current owner key whenever the shell is looking at a persisted starter dashboard.
+- `apps/web/src/App.tsx` also records the last successful starter refresh outcome as `Created`, `Refreshed`, or `Already aligned`, then surfaces that result as a separate status pill instead of only burying it in the notice text.
+- `apps/web/src/styles.css` added the small layout and badge styling needed for the richer starter metadata header inside the existing runtime toolbar.
+
+Functional result:
+- Operators can now tell not only whether starter refresh is allowed, but also when the persisted starter last changed and what the most recent refresh action actually did.
+- The runtime toolbar now distinguishes between newly created starter persistence, real seed refreshes, and no-op alignment checks without requiring the user to parse a longer notice sentence.
+- Persisted starter ownership, status, and freshness are visible together in one place, which reduces the need to inspect the API response manually.
+
+Validation:
+- `npm run build:web`
