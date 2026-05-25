@@ -338,3 +338,21 @@ Functional result:
 Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
 - `python3 -m compileall apps/api/app apps/api/tests`
+
+## c6d49eb2 · Page-aware dashboard runtime
+
+Intent: stop treating the first dashboard page as the only runtime surface so persisted dashboards with multiple pages can switch the active page inside the web shell.
+
+What changed:
+- `apps/web/src/App.tsx` added active page state and helper functions that resolve the selected dashboard page before deriving runtime panels.
+- `apps/web/src/App.tsx` changed panel execution so scorecards and tables are loaded from the active page's placements instead of always reading `dashboardDocument.pages[0]`.
+- `apps/web/src/App.tsx` also added active page metadata to the runtime header, rendered a page selector when the dashboard document has more than one page, and removed the remaining `pages[0]` assumption from the dashboard document preview.
+- `apps/web/src/styles.css` added the toolbar and page-selector styles needed for the new active-page controls across desktop and mobile layouts.
+
+Functional result:
+- The live panel runtime can now follow the currently selected dashboard page rather than being pinned to the first page in the document.
+- Persisted multi-page dashboards can expose different panel groups in the existing shell without changing the backend API contract.
+- The dashboard document preview now reflects the full page list instead of silently describing only page 1.
+
+Validation:
+- `npm run build:web`
