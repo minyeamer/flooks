@@ -3,7 +3,71 @@
 This file is the canonical English implementation log for the FLooks bootstrap.
 Each entry is written after the relevant work lands so another engineer can understand what was built, why it was built, which files carried the behavior, and which checks were used to validate it.
 
-## 9bf7378 · Metadata persistence baseline
+## e83be0a8 · Initial repository baseline
+
+Intent: establish the repository with a license before any product or runtime code landed.
+
+What changed:
+- `LICENSE` added the project license text so the repository had an explicit legal baseline from the first commit.
+
+Functional result:
+- The repository started with a declared license before any application scaffolding or product implementation was added.
+
+## c8b47488 · Platform bootstrap and live overview slice
+
+Intent: create the initial FLooks monorepo, ship the first runnable API and web shell, and lay down the documentation and development workflow for the whole platform.
+
+What changed:
+- Root project files such as `.dockerignore`, `.editorconfig`, `.env.example`, `.gitignore`, `.pre-commit-config.yaml`, `package.json`, `package-lock.json`, `tsconfig.base.json`, `AGENTS.md`, and `.github/copilot-instructions.md` established workspace conventions, package management, local environment examples, and shared coding guidance.
+- `apps/api/pyproject.toml`, `apps/api/Dockerfile`, `apps/api/app/main.py`, `apps/api/app/core/config.py`, and `apps/api/app/api/router.py` created the first FastAPI service with CORS, environment parsing, and route registration.
+- `apps/api/app/api/routes/health.py`, `apps/api/app/api/routes/system.py`, and `apps/api/app/api/routes/overview.py` introduced the original live bootstrap endpoints so the frontend could discover health, system metadata, and roadmap status from the running backend.
+- `apps/api/app/domain/enums.py` added the first shared backend enums for system roles, modules, and data source kinds.
+- `apps/api/tests/test_system.py` added the first API contract tests for the health, system, and overview surfaces.
+- `apps/web/package.json`, `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx`, `apps/web/src/styles.css`, `apps/web/tsconfig.json`, and `apps/web/vite.config.ts` bootstrapped the React/Vite shell and connected it to the live overview and system APIs.
+- `packages/dashboard-schema/package.json` and `packages/dashboard-schema/src/index.ts` introduced the first shared dashboard document contract so frontend work had a typed seed dashboard and shared enums.
+- `deploy/compose/docker-compose.dev.yml`, `apps/web/Dockerfile`, and `apps/api/Dockerfile` added the first compose-based local environment for running the stack together.
+- `README.md`, `docs/adr/0001-platform-baseline.md`, `docs/architecture/*.md`, `docs-ko/README.md`, and `docs-ko/architecture/*.md` defined the initial product intent, architecture, extension paths, and the English-vs-Korean documentation split.
+
+Functional result:
+- The repository became a runnable monorepo with a FastAPI backend, a React web shell, a shared schema package, and compose support.
+- The shell could already render live bootstrap information from the API instead of only static marketing copy.
+- The documentation baseline for connectors, panel SDK, AI harness direction, and product scope was in place before deeper implementation work began.
+
+## c1815aa0 · Identity and permissions bootstrap APIs
+
+Intent: turn identity and permission planning into a typed backend contract that clients and future auth flows could consume.
+
+What changed:
+- `apps/api/app/domain/identity.py` added typed models for authentication methods, approval stages, session policy, system roles, ACL targets, dataset grant axes, and hidden-resource behavior.
+- `apps/api/app/api/routes/identity.py` added `GET /api/v1/identity/bootstrap` to expose the initial identity and permission baseline as a stable API payload.
+- `apps/api/app/api/router.py` registered the new identity route.
+- `apps/api/app/api/routes/overview.py` updated the overview stage list and service links so the shell reported identity and permissions as a delivered backend slice.
+- `apps/api/app/api/routes/health.py`, `apps/api/app/api/routes/system.py`, `apps/api/app/main.py`, and `apps/api/app/__init__.py` were cleaned up to use explicit typing, absolute `app...` imports, and clearer module docstrings while the identity slice was added.
+- `apps/api/app/core/config.py` and `apps/api/app/domain/enums.py` gained supporting values needed by the new identity contract.
+- `apps/api/tests/test_system.py` added coverage for the identity bootstrap response and the updated overview payload.
+
+Functional result:
+- The backend exposed a machine-readable identity and permissions baseline instead of leaving those rules only in architecture docs.
+- The shell and future clients could discover approval flow, role boundaries, and dataset grant axes from a live endpoint.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_system.py`
+- `python3 -m compileall apps/api/app apps/api/tests`
+
+## d7231856 · Early backend phase and style alignment
+
+Intent: move the written roadmap forward after the identity slice landed and lock in backend coding conventions before the next implementation phase.
+
+What changed:
+- `README.md` recorded `/api/v1/identity/bootstrap` and updated the near-term phase ordering so metadata persistence was clearly the next implementation slice.
+- `docs/architecture/overview.md` and `docs-ko/architecture/overview.md` marked the identity baseline as delivered and advanced the plan to metadata persistence.
+- `AGENTS.md` and `.github/copilot-instructions.md` added explicit repository guidance for backend work, including absolute `app` imports, English module docstrings, explicit typing for public contracts, and the planned `ruff` check direction.
+
+Functional result:
+- The repo documentation stopped treating identity bootstrap as planned work and started treating it as delivered behavior.
+- Contributors got concrete backend style rules before the database and query slices expanded the codebase.
+
+## 9bf73789 · Metadata persistence baseline
 
 Intent: move dashboard and permission metadata out of placeholders and into a real relational backend that the API can introspect and migrate.
 
@@ -27,7 +91,7 @@ Validation:
 - `python3 -m compileall apps/api/app apps/api/tests`
 - `python3 -m alembic -c apps/api/alembic.ini upgrade head`
 
-## d39aaa6 · Metadata database defaults
+## d39aaa6e · Metadata database defaults
 
 Intent: make the new metadata persistence layer runnable in both direct local execution and the compose stack without manual environment patching.
 
@@ -42,7 +106,7 @@ Functional result:
 Validation:
 - `docker compose -f deploy/compose/docker-compose.dev.yml config`
 
-## f1d4700 · Metadata persistence documentation alignment
+## f1d47000 · Metadata persistence documentation alignment
 
 Intent: document the delivered metadata slice and keep repository guidance in sync with the new backend baseline.
 
@@ -55,7 +119,7 @@ Functional result:
 - New contributors could see that metadata persistence was already live and understand how to migrate the schema.
 - Repository instructions matched the coding style used in the backend slice.
 
-## 98e4d5b · Governed query bootstrap APIs
+## 98e4d5bf · Governed query bootstrap APIs
 
 Intent: introduce a typed query contract so panels and future AI flows could ask for governed data without exposing raw SQL.
 
@@ -78,7 +142,7 @@ Validation:
 - `python3 -m compileall apps/api/app apps/api/tests`
 - Live requests to `/api/v1/query/bootstrap` and `/api/v1/query/validate`
 
-## 8c4e355 · Bootstrap API reference viewer
+## 8c4e3557 · Bootstrap API reference viewer
 
 Intent: make the live API contract visible in the product itself instead of forcing users to read Swagger or source code.
 
@@ -100,7 +164,7 @@ Validation:
 - `python3 -m compileall apps/api/app apps/api/tests`
 - `npm run build:web`
 
-## f9b0d9d · Dashboard CRUD and version persistence
+## f9b0d9d2 · Dashboard CRUD and version persistence
 
 Intent: turn the metadata persistence baseline into real dashboard document APIs with version history.
 
@@ -123,7 +187,7 @@ Validation:
 - `python3 -m compileall apps/api/app apps/api/tests`
 - `npm run build:web`
 
-## 0e896a8 · Governed query execution with POSTGRES connector
+## 0e896a8b · Governed query execution with POSTGRES connector
 
 Intent: move the governed query system from validation-only into real execution against the first supported database connector.
 
@@ -141,7 +205,7 @@ Functional result:
 - A validated QuerySpec could now produce live rows from a POSTGRES-backed dataset.
 - The query layer stopped being only a contract preview and became the first usable data path for panels.
 
-## b7e5fde · Query execution documentation alignment
+## b7e5fde6 · Query execution documentation alignment
 
 Intent: remove stale documentation that still described query execution as future work after the feature had already landed.
 
@@ -157,7 +221,7 @@ Functional result:
 Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py apps/api/tests/test_system.py`
 
-## 828d0d0 · Overview and query execution hardening
+## 828d0d0e · Overview and query execution hardening
 
 Intent: make the status surfaces truthful and make unsupported connector requests fail explicitly instead of relying on implicit assumptions.
 
@@ -177,7 +241,7 @@ Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py apps/api/tests/test_system.py`
 - `python3 -m compileall apps/api/app apps/api/tests`
 
-## b01dab6 · Live query panel preview
+## b01dab69 · Live query panel preview
 
 Intent: prove that the web shell could consume the live query execution API and render real runtime output instead of only metadata panels.
 
@@ -194,7 +258,7 @@ Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_query.py`
 - `npm run build:web`
 
-## 4bdb878 · Starter panels driven from the dashboard document
+## 4bdb878a · Starter panels driven from the dashboard document
 
 Intent: stop hardcoding the panel runtime request in the web shell and move first-party panel definitions into the shared dashboard document contract.
 
@@ -211,7 +275,7 @@ Functional result:
 Validation:
 - `npm run build:web`
 
-## e7bb451 · Persisted dashboard runtime
+## e7bb4510 · Persisted dashboard runtime
 
 Intent: let the runtime use the stored dashboard document from the backend when it exists, while keeping the starter seed as a safe fallback.
 
@@ -228,3 +292,16 @@ Functional result:
 Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
 - `npm run build:web`
+
+## 3980b021 · Canonical implementation work log
+
+Intent: stop keeping implementation history only in chat responses or commit subjects and store a reusable engineering log inside the repository.
+
+What changed:
+- `docs/playbooks/work-log.md` was created as the canonical English implementation log for the FLooks bootstrap.
+- `AGENTS.md` added repository-level rules that require future work logs to be saved in the repo, grouped by commit, and detailed enough to rebuild a similar result from a clean folder.
+- `.github/copilot-instructions.md` added the same policy for Copilot-facing instructions so future completions do not fall back to thin commit-message summaries.
+
+Functional result:
+- The repository now has a persistent implementation history that explains delivered behavior commit by commit.
+- Future work-log updates are constrained by repo instructions instead of depending on ad hoc chat behavior.

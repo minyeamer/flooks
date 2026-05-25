@@ -43,6 +43,7 @@ FLooks is an internal-first enterprise dashboard platform. Prioritize governed d
 
 - Maintain `docs/playbooks/work-log.md` as the canonical English implementation log for this repository.
 - After committed work, append or update one entry per commit in `docs/playbooks/work-log.md` before closing the task when practical.
+- Use 8-character short commit hashes in work-log section headings.
 - Each entry must explain enough for another engineer to reproduce a similar slice from a clean folder: state the intent, the key files or modules changed, the API/UI/schema behavior that changed, and the validation that proved it worked.
 - Do not treat the commit subject or commit body alone as a sufficient work log. Rewrite the change in plain English with concrete implementation detail.
 - Keep the writing compact and changelog-like, but not shallow. Avoid ornate document structure; preserve implementation detail.
