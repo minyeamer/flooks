@@ -503,3 +503,22 @@ Functional result:
 
 Validation:
 - `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
+
+## 0651c2d5 · Starter refresh route
+
+Intent: give operators a deliberate backfill path for the canonical starter dashboard seed instead of relying only on implicit refresh behavior during normal dashboard reads.
+
+What changed:
+- `apps/api/app/api/routes/dashboards.py` added `POST /api/v1/dashboards/{slug}/refresh-starter`, a starter-only route that can explicitly seed `commerce-home` into an already initialized metadata store or return the current starter detail when the canonical seed is already current.
+- `apps/api/app/api/routes/dashboards.py` also refactored the starter bootstrap helpers so the explicit route can reuse the same create, auto-managed refresh, and user-managed protection logic as the implicit starter path.
+- `apps/api/app/api/routes/overview.py` added the starter refresh surface to the live service links and updated the endpoint count so the overview payload stays aligned with the runnable API surface.
+- `apps/api/app/api/routes/reference.py` documented the new starter refresh endpoint in the structured API reference and switched the dashboard document example to the canonical `build_starter_dashboard_document()` output so the web-visible docs stay aligned with the current starter seed.
+- `apps/api/tests/test_dashboards.py` and `apps/api/tests/test_system.py` added coverage for explicit starter seeding into an initialized store, rejection of user-managed starter refresh requests, the new overview service link, and the new API reference entry.
+
+Functional result:
+- Operators can now explicitly create or recheck the canonical starter dashboard even after the metadata store already contains other dashboards.
+- The explicit route stays conservative because user-managed starter dashboards still return a conflict instead of being overwritten by the bootstrap seed.
+- The web-visible bootstrap docs now advertise the route and show a current starter dashboard example instead of drifting behind the canonical seed.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py apps/api/tests/test_system.py`
