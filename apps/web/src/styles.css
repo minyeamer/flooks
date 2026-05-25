@@ -554,6 +554,11 @@ h1 {
   align-items: baseline;
 }
 
+.runtimeStarterHistorySummaryText {
+  display: grid;
+  gap: 2px;
+}
+
 .runtimeStarterHistorySummary strong {
   font-size: 0.79rem;
   color: var(--ink);
@@ -563,6 +568,46 @@ h1 {
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.45;
+}
+
+.runtimeStarterHistoryFilters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.runtimeStarterHistoryFilterButton {
+  padding: 4px 10px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.runtimeStarterHistoryFilterButton:hover {
+  border-color: rgba(15, 118, 110, 0.24);
+}
+
+.runtimeStarterHistoryFilterButton:disabled,
+.runtimeStarterHistoryFilterButton:disabled:hover {
+  border-color: rgba(24, 34, 45, 0.08);
+  background: rgba(24, 34, 45, 0.04);
+  color: rgba(91, 104, 115, 0.56);
+  cursor: not-allowed;
+}
+
+.runtimeStarterHistoryFilterButtonActive {
+  border-color: rgba(15, 118, 110, 0.2);
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--accent);
 }
 
 .runtimeStarterHistoryItem {
@@ -644,6 +689,16 @@ h1 {
 
 .runtimeStarterHistoryItem p {
   margin: 0;
+}
+
+.runtimeStarterHistoryEmpty {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(24, 34, 45, 0.12);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .runtimeStarterHistoryErrorDetails {

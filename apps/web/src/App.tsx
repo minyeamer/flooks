@@ -148,6 +148,8 @@ type StarterRefreshHistoryTone = 'success' | 'error';
 
 type StarterRefreshHistoryKind = 'created' | 'refreshed' | 'aligned' | 'failed';
 
+type StarterRefreshHistoryFilter = 'all' | 'failed';
+
 type StarterRefreshHistoryEntry = {
   id: string;
   summary: string;
@@ -842,6 +844,8 @@ function App() {
   const [starterRefreshHistory, setStarterRefreshHistory] = useState<StarterRefreshHistoryEntry[]>(() =>
     loadStarterRefreshHistory(),
   );
+  const [starterRefreshHistoryFilter, setStarterRefreshHistoryFilter] =
+    useState<StarterRefreshHistoryFilter>('all');
   const [isClearStarterHistoryArmed, setIsClearStarterHistoryArmed] = useState<boolean>(false);
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
@@ -1195,6 +1199,15 @@ function App() {
   }, [starterRefreshHistory]);
 
   useEffect(() => {
+    if (
+      starterRefreshHistoryFilter === 'failed' &&
+      starterRefreshHistory.every((entry) => entry.tone !== 'error')
+    ) {
+      setStarterRefreshHistoryFilter('all');
+    }
+  }, [starterRefreshHistory, starterRefreshHistoryFilter]);
+
+  useEffect(() => {
     setActivePageId((currentPageId) => {
       if (
         currentPageId != null &&
@@ -1312,6 +1325,12 @@ function App() {
       : starterRefreshHistory.length > 0
       ? 'Clear recent starter actions saved for this browser session'
       : 'No recent starter actions saved for this browser session';
+  const failedStarterRefreshHistoryCount = starterRefreshHistory.filter(
+    (entry) => entry.tone === 'error',
+  ).length;
+  const visibleStarterRefreshHistory = starterRefreshHistoryFilter === 'failed'
+    ? starterRefreshHistory.filter((entry) => entry.tone === 'error')
+    : starterRefreshHistory;
   const formattedPersistedDashboardUpdatedAt =
     persistedDashboardUpdatedAt != null
       ? dateTimeFormatter.format(new Date(persistedDashboardUpdatedAt))
@@ -1663,45 +1682,73 @@ function App() {
                 {starterRefreshHistory.length > 0 ? (
                   <div className="runtimeStarterHistory" aria-label="Recent starter refresh actions">
                     <div className="runtimeStarterHistorySummary">
-                      <strong>Recent starter actions</strong>
-                      <span>Persists for this browser session</span>
+                      <div className="runtimeStarterHistorySummaryText">
+                        <strong>Recent starter actions</strong>
+                        <span>Persists for this browser session</span>
+                      </div>
+                      <div className="runtimeStarterHistoryFilters" aria-label="Starter history filters">
+                        <button
+                          type="button"
+                          className={`runtimeStarterHistoryFilterButton${starterRefreshHistoryFilter === 'all' ? ' runtimeStarterHistoryFilterButtonActive' : ''}`}
+                          onClick={() => setStarterRefreshHistoryFilter('all')}
+                        >
+                          All
+                        </button>
+                        <button
+                          type="button"
+                          className={`runtimeStarterHistoryFilterButton${starterRefreshHistoryFilter === 'failed' ? ' runtimeStarterHistoryFilterButtonActive' : ''}`}
+                          disabled={failedStarterRefreshHistoryCount === 0}
+                          onClick={() => setStarterRefreshHistoryFilter('failed')}
+                          title={
+                            failedStarterRefreshHistoryCount > 0
+                              ? `Show ${failedStarterRefreshHistoryCount} failed starter action${failedStarterRefreshHistoryCount === 1 ? '' : 's'}`
+                              : 'No failed starter actions in this browser session'
+                          }
+                        >
+                          Failed
+                        </button>
+                      </div>
                     </div>
-                    {starterRefreshHistory.map((entry) => (
-                      <article
-                        className={`runtimeStarterHistoryItem${entry.tone === 'error' ? ' runtimeStarterHistoryItemError' : ''}`}
-                        key={entry.id}
-                      >
-                        <div className="runtimeStarterHistoryHeader">
-                          <div className="runtimeStarterHistoryHeadline">
-                            {entry.actionKind ? (
-                              <span
-                                className={`runtimeStarterHistoryBadge runtimeStarterHistoryBadge${entry.actionKind[0].toUpperCase()}${entry.actionKind.slice(1)}`}
-                              >
-                                {getStarterRefreshHistoryKindLabel(entry.actionKind)}
-                              </span>
-                            ) : null}
-                            <strong>{entry.summary}</strong>
+                    {visibleStarterRefreshHistory.length > 0 ? (
+                      visibleStarterRefreshHistory.map((entry) => (
+                        <article
+                          className={`runtimeStarterHistoryItem${entry.tone === 'error' ? ' runtimeStarterHistoryItemError' : ''}`}
+                          key={entry.id}
+                        >
+                          <div className="runtimeStarterHistoryHeader">
+                            <div className="runtimeStarterHistoryHeadline">
+                              {entry.actionKind ? (
+                                <span
+                                  className={`runtimeStarterHistoryBadge runtimeStarterHistoryBadge${entry.actionKind[0].toUpperCase()}${entry.actionKind.slice(1)}`}
+                                >
+                                  {getStarterRefreshHistoryKindLabel(entry.actionKind)}
+                                </span>
+                              ) : null}
+                              <strong>{entry.summary}</strong>
+                            </div>
+                            <span>{entry.timestampLabel}</span>
                           </div>
-                          <span>{entry.timestampLabel}</span>
-                        </div>
-                        <p>{entry.detail}</p>
-                        {entry.rawDetail != null ? (
-                          <details className="runtimeStarterHistoryErrorDetails">
-                            <summary className="runtimeStarterHistoryErrorSummary">Raw error</summary>
-                            <p className="runtimeStarterHistoryErrorMessage">{entry.rawDetail}</p>
-                          </details>
-                        ) : null}
-                        {entry.contextLabels.length > 0 ? (
-                          <div className="runtimeStarterHistoryLabels" aria-label="Starter action context">
-                            {entry.contextLabels.map((label) => (
-                              <span className="runtimeStarterHistoryTag" key={`${entry.id}-${label}`}>
-                                {label}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </article>
-                    ))}
+                          <p>{entry.detail}</p>
+                          {entry.rawDetail != null ? (
+                            <details className="runtimeStarterHistoryErrorDetails">
+                              <summary className="runtimeStarterHistoryErrorSummary">Raw error</summary>
+                              <p className="runtimeStarterHistoryErrorMessage">{entry.rawDetail}</p>
+                            </details>
+                          ) : null}
+                          {entry.contextLabels.length > 0 ? (
+                            <div className="runtimeStarterHistoryLabels" aria-label="Starter action context">
+                              {entry.contextLabels.map((label) => (
+                                <span className="runtimeStarterHistoryTag" key={`${entry.id}-${label}`}>
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                        </article>
+                      ))
+                    ) : (
+                      <p className="runtimeStarterHistoryEmpty">No failed starter actions in this browser session.</p>
+                    )}
                   </div>
                 ) : null}
               </div>
