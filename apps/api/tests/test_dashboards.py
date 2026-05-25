@@ -186,6 +186,86 @@ def test_dashboard_get_bootstraps_starter_dashboard_when_store_is_empty(
     assert body["versions"][0]["createdBy"] == "system-bootstrap"
 
 
+def test_dashboard_get_refreshes_auto_managed_legacy_starter_dashboard(
+    dashboard_client: TestClient,
+) -> None:
+    create_response = dashboard_client.post(
+        "/api/v1/dashboards",
+        json={
+            "slug": STARTER_DASHBOARD_SLUG,
+            "description": "Starter executive dashboard seeded for the first runtime session.",
+            "ownerPrincipalKind": "user",
+            "ownerPrincipalKey": "system-bootstrap",
+            "createdBy": "system-bootstrap",
+            "summary": "Bootstrap starter dashboard seeded automatically.",
+            "document": _build_legacy_dashboard_document(
+                version=1,
+                title="Commerce Executive Overview",
+                key=STARTER_DASHBOARD_SLUG,
+            ),
+        },
+    )
+
+    assert create_response.status_code == 201
+    created_body = create_response.json()
+
+    assert created_body["latestVersionNumber"] == 2
+    assert created_body["document"]["version"] == 2
+    assert created_body["document"]["panelLibrary"][6]["title"] == "Operations Notice"
+
+    response = dashboard_client.get(f"/api/v1/dashboards/{STARTER_DASHBOARD_SLUG}")
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["latestVersionNumber"] == 2
+    assert body["document"]["version"] == 2
+    assert body["document"]["panelLibrary"][6]["title"] == "Operations Notice"
+    assert [version["createdBy"] for version in body["versions"]] == ["system-bootstrap", "system-bootstrap"]
+    assert body["versions"][1]["summary"] == "Canonical starter dashboard refreshed automatically."
+
+    version_one_response = dashboard_client.get(
+        f"/api/v1/dashboards/{STARTER_DASHBOARD_SLUG}",
+        params={"version": 1},
+    )
+
+    assert version_one_response.status_code == 200
+    assert len(version_one_response.json()["document"]["panelLibrary"]) == 3
+
+
+def test_dashboard_get_does_not_refresh_user_managed_legacy_starter_dashboard(
+    dashboard_client: TestClient,
+) -> None:
+    create_response = dashboard_client.post(
+        "/api/v1/dashboards",
+        json={
+            "slug": STARTER_DASHBOARD_SLUG,
+            "description": "User-owned starter dashboard.",
+            "ownerPrincipalKind": "user",
+            "ownerPrincipalKey": "owner-1",
+            "createdBy": "owner-1",
+            "summary": "Initial custom starter version.",
+            "document": _build_legacy_dashboard_document(
+                version=1,
+                title="Commerce Executive Overview",
+                key=STARTER_DASHBOARD_SLUG,
+            ),
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    response = dashboard_client.get(f"/api/v1/dashboards/{STARTER_DASHBOARD_SLUG}")
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["latestVersionNumber"] == 1
+    assert body["document"]["version"] == 1
+    assert len(body["document"]["panelLibrary"]) == 3
+    assert body["versions"][0]["createdBy"] == "owner-1"
+
+
 def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key: str = "commerce-home") -> dict[str, object]:
     return {
         "id": "db-home",
@@ -379,5 +459,115 @@ def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key
                     "limit": 1,
                 },
             }
+        ],
+    }
+
+
+def _build_legacy_dashboard_document(
+    *,
+    version: int,
+    title: str = "Commerce Executive Overview",
+    key: str = STARTER_DASHBOARD_SLUG,
+) -> dict[str, object]:
+    return {
+        "id": "db-home",
+        "key": key,
+        "title": title,
+        "version": version,
+        "ownerRoleBoundary": "ADMIN",
+        "supportedDataSources": ["POSTGRES"],
+        "pages": [
+            {
+                "id": "page-overview",
+                "title": "Overview",
+                "width": 1600,
+                "height": 900,
+                "snapGrid": {"columnWidth": 20, "rowHeight": 20},
+                "placements": [
+                    {
+                        "panelId": "panel-gmv",
+                        "x": 40,
+                        "y": 40,
+                        "width": 300,
+                        "height": 180,
+                        "zIndex": 1,
+                    },
+                    {
+                        "panelId": "panel-revenue",
+                        "x": 360,
+                        "y": 40,
+                        "width": 300,
+                        "height": 180,
+                        "zIndex": 1,
+                    },
+                    {
+                        "panelId": "panel-channel-table",
+                        "x": 40,
+                        "y": 240,
+                        "width": 920,
+                        "height": 320,
+                        "zIndex": 1,
+                    },
+                ],
+            }
+        ],
+        "panelLibrary": [
+            {
+                "id": "panel-gmv",
+                "key": "gmv-scorecard",
+                "kind": "scorecard",
+                "title": "GMV",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": [],
+                    "metrics": [{"key": "gmv", "aggregate": "sum"}],
+                    "limit": 1,
+                },
+                "scorecard": {
+                    "description": "Total GMV from the stored dashboard document.",
+                    "valueField": "gmv",
+                    "valuePrefix": "$",
+                },
+            },
+            {
+                "id": "panel-revenue",
+                "key": "revenue-scorecard",
+                "kind": "scorecard",
+                "title": "Revenue",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": [],
+                    "metrics": [{"key": "revenue", "aggregate": "sum"}],
+                    "limit": 1,
+                },
+                "scorecard": {
+                    "description": "Net revenue total executed from the starter dashboard document.",
+                    "valueField": "revenue",
+                    "valuePrefix": "$",
+                },
+            },
+            {
+                "id": "panel-channel-table",
+                "key": "channel-revenue-table",
+                "kind": "table",
+                "title": "Revenue by Channel",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": ["channel_name"],
+                    "metrics": [{"key": "revenue", "aggregate": "sum"}],
+                    "sort": [{"field": "revenue", "direction": "desc"}],
+                    "limit": 5,
+                },
+                "table": {
+                    "description": "Top channels by revenue from the stored dashboard document.",
+                    "columns": ["channel_name", "revenue"],
+                },
+            },
         ],
     }

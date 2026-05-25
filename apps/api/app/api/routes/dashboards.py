@@ -24,6 +24,12 @@ from app.domain.persistence import DashboardVersionStatus, PrincipalKind
 
 router = APIRouter(tags=["dashboards"])
 _SEEDED_DASHBOARD_BINDS: WeakSet[object] = WeakSet()
+_STARTER_DASHBOARD_CREATED_BY = "system-bootstrap"
+_STARTER_DASHBOARD_DESCRIPTION = "Starter executive dashboard seeded for the first runtime session."
+_AUTO_MANAGED_STARTER_SUMMARIES = {
+    "Bootstrap starter dashboard seeded automatically.",
+    "Canonical starter dashboard refreshed automatically.",
+}
 
 
 @router.get(
@@ -256,6 +262,23 @@ def _ensure_document_key_matches_slug(slug: str, document_key: str) -> None:
 
 def _ensure_starter_dashboard_seeded(session: Session, slug: str | None = None) -> None:
     bind = session.get_bind()
+
+    if slug is not None and slug != STARTER_DASHBOARD_SLUG:
+        return
+
+    starter_record = session.scalar(
+        select(DashboardRecord)
+        .options(selectinload(DashboardRecord.versions))
+        .where(DashboardRecord.slug == STARTER_DASHBOARD_SLUG)
+    )
+
+    if starter_record is not None:
+        if _should_refresh_starter_dashboard(starter_record):
+            _refresh_starter_dashboard(session, starter_record)
+
+        _SEEDED_DASHBOARD_BINDS.add(bind)
+        return
+
     has_any_dashboards = session.scalar(select(DashboardRecord.id).limit(1)) is not None
 
     if has_any_dashboards:
@@ -265,23 +288,20 @@ def _ensure_starter_dashboard_seeded(session: Session, slug: str | None = None) 
     if bind in _SEEDED_DASHBOARD_BINDS:
         return
 
-    if slug is not None and slug != STARTER_DASHBOARD_SLUG:
-        return
-
     starter_document = build_starter_dashboard_document()
     starter_version = DashboardVersionRecord(
         version_number=1,
         status=DashboardVersionStatus.DRAFT,
         document=starter_document.model_dump(mode="json", by_alias=True),
         summary="Bootstrap starter dashboard seeded automatically.",
-        created_by="system-bootstrap",
+        created_by=_STARTER_DASHBOARD_CREATED_BY,
     )
     starter_record = DashboardRecord(
         slug=STARTER_DASHBOARD_SLUG,
         title=starter_document.title,
-        description="Starter executive dashboard seeded for the first runtime session.",
+        description=_STARTER_DASHBOARD_DESCRIPTION,
         owner_principal_kind=PrincipalKind.USER,
-        owner_principal_key="system-bootstrap",
+        owner_principal_key=_STARTER_DASHBOARD_CREATED_BY,
         latest_version_number=1,
         versions=[starter_version],
     )
@@ -293,3 +313,45 @@ def _ensure_starter_dashboard_seeded(session: Session, slug: str | None = None) 
 
 def _mark_dashboard_store_initialized(session: Session) -> None:
     _SEEDED_DASHBOARD_BINDS.add(session.get_bind())
+
+
+def _should_refresh_starter_dashboard(dashboard_record: DashboardRecord) -> bool:
+    versions = _sorted_versions(dashboard_record)
+
+    if not versions or not all(_is_auto_managed_starter_version(version) for version in versions):
+        return False
+
+    latest_version = versions[-1]
+    current_document = _parse_dashboard_document(latest_version)
+    expected_document = build_starter_dashboard_document(version=latest_version.version_number)
+
+    return current_document != expected_document
+
+
+def _is_auto_managed_starter_version(version_record: DashboardVersionRecord) -> bool:
+    return (
+        version_record.created_by == _STARTER_DASHBOARD_CREATED_BY
+        and version_record.summary in _AUTO_MANAGED_STARTER_SUMMARIES
+    )
+
+
+def _refresh_starter_dashboard(session: Session, dashboard_record: DashboardRecord) -> None:
+    latest_version = _get_version_record(dashboard_record, None)
+    next_version_number = dashboard_record.latest_version_number + 1
+    starter_document = build_starter_dashboard_document(version=next_version_number)
+
+    dashboard_record.title = starter_document.title
+    dashboard_record.description = _STARTER_DASHBOARD_DESCRIPTION
+    dashboard_record.latest_version_number = next_version_number
+    dashboard_record.versions.append(
+        DashboardVersionRecord(
+            version_number=next_version_number,
+            status=latest_version.status,
+            document=starter_document.model_dump(mode="json", by_alias=True),
+            summary="Canonical starter dashboard refreshed automatically.",
+            created_by=_STARTER_DASHBOARD_CREATED_BY,
+        )
+    )
+
+    session.add(dashboard_record)
+    session.commit()
