@@ -855,3 +855,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 7b9dded4 · Timestamp starter history summary
+
+Intent: add time context to the starter history summary row so operators can see how recent the visible activity is and when the latest failure happened without opening any individual history cards.
+
+What changed:
+- `apps/web/src/App.tsx` now derives the latest visible starter history timestamp directly from the current filtered history slice.
+- `apps/web/src/App.tsx` also derives the latest failed starter history timestamp across the current browser-session history.
+- `apps/web/src/App.tsx` renders new summary badges for the latest visible action and latest failure timestamp alongside the existing filter, count, and raw-error state badges.
+
+Functional result:
+- Operators can tell how fresh the currently viewed starter history slice is without scanning the first card manually.
+- Recent failure timing is visible directly from the summary row, which speeds up failure triage when the current view is filtered away from failed items.
+- The summary row now carries both state and recency context for the recent starter activity trail.
+
+Validation:
+- `npm run build:web`
