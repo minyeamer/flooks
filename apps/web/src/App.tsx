@@ -168,6 +168,11 @@ const runtimeCanvasScaleModes: Array<{
   },
 ];
 
+const runtimeCanvasZoomPercentDefault = 100;
+const runtimeCanvasZoomPercentStep = 15;
+const runtimeCanvasZoomPercentMin = 85;
+const runtimeCanvasZoomPercentMax = 170;
+
 function isScorecardPanel(
   panel: PanelRef | undefined,
 ): panel is PanelRef & {
@@ -295,8 +300,21 @@ function formatRuntimeCanvasLabel(
   return `Canvas ${page.width}×${page.height}px · Snap ${page.snapGrid.columnWidth}×${page.snapGrid.rowHeight}px · ${gridMetrics.columnCount}×${gridMetrics.rowCount} cells`;
 }
 
-function getRuntimeCanvasScaleFactor(scaleMode: RuntimeCanvasScaleMode): number {
-  return scaleMode === 'detail' ? 1.35 : 1;
+function clampRuntimeCanvasZoomPercent(zoomPercent: number): number {
+  return clampGridValue(
+    zoomPercent,
+    runtimeCanvasZoomPercentMin,
+    runtimeCanvasZoomPercentMax,
+  );
+}
+
+function getRuntimeCanvasScaleFactor(
+  scaleMode: RuntimeCanvasScaleMode,
+  zoomPercent: number,
+): number {
+  const baseScale = scaleMode === 'detail' ? 1.35 : 1;
+
+  return (baseScale * clampRuntimeCanvasZoomPercent(zoomPercent)) / 100;
 }
 
 function clampGridValue(value: number, minimum: number, maximum: number): number {
@@ -322,10 +340,8 @@ function getRuntimeGridMetrics(page: DashboardPage): RuntimeGridMetrics {
 function getRuntimeCanvasStyle(
   page: DashboardPage,
   gridMetrics: RuntimeGridMetrics,
-  scaleMode: RuntimeCanvasScaleMode,
+  scaleFactor: number,
 ): RuntimeGridStyle {
-  const scaleFactor = getRuntimeCanvasScaleFactor(scaleMode);
-
   return {
     aspectRatio: `${page.width} / ${page.height}`,
     width: scaleFactor === 1 ? '100%' : `calc(100% * ${scaleFactor})`,
@@ -476,6 +492,9 @@ function App() {
   const [dashboardNotice, setDashboardNotice] = useState<string | null>(null);
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
+  const [runtimeCanvasZoomPercent, setRuntimeCanvasZoomPercent] = useState<number>(
+    runtimeCanvasZoomPercentDefault,
+  );
   const [panelRuntime, setPanelRuntime] = useState<Record<string, PanelRuntimeEntry>>(() =>
     buildInitialPanelRuntime(starterDashboard, getDefaultDashboardPageId(starterDashboard)),
   );
@@ -688,14 +707,23 @@ function App() {
   const activeDashboardPage = getActiveDashboardPage(dashboardDocument, activePageId);
   const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
   const runtimeGridMetrics = activeDashboardPage ? getRuntimeGridMetrics(activeDashboardPage) : null;
+  const runtimeCanvasScaleFactor = getRuntimeCanvasScaleFactor(
+    runtimeCanvasScaleMode,
+    runtimeCanvasZoomPercent,
+  );
   const runtimeCanvasStyle =
     activeDashboardPage && runtimeGridMetrics
-      ? getRuntimeCanvasStyle(activeDashboardPage, runtimeGridMetrics, runtimeCanvasScaleMode)
+      ? getRuntimeCanvasStyle(activeDashboardPage, runtimeGridMetrics, runtimeCanvasScaleFactor)
       : undefined;
   const runtimeCanvasLabel =
     activeDashboardPage && runtimeGridMetrics
       ? formatRuntimeCanvasLabel(activeDashboardPage, runtimeGridMetrics)
       : null;
+  const runtimeCanvasZoomLabel = `${Math.round(runtimeCanvasScaleFactor * 100)}%`;
+  const isRuntimeCanvasZoomOutDisabled = runtimeCanvasZoomPercent <= runtimeCanvasZoomPercentMin;
+  const isRuntimeCanvasZoomInDisabled = runtimeCanvasZoomPercent >= runtimeCanvasZoomPercentMax;
+  const isRuntimeCanvasDefaultView =
+    runtimeCanvasScaleMode === 'fit' && runtimeCanvasZoomPercent === runtimeCanvasZoomPercentDefault;
   const heroTitle = overview?.headline ?? 'Flexible enterprise dashboards for governed commerce analytics.';
   const heroSummary =
     overview?.summary ??
@@ -1004,6 +1032,49 @@ function App() {
                   </button>
                 ))}
               </div>
+              <div className="runtimeControlGroup" aria-label="Runtime canvas zoom controls">
+                <button
+                  type="button"
+                  className="runtimeControl"
+                  disabled={isRuntimeCanvasZoomOutDisabled}
+                  onClick={() =>
+                    setRuntimeCanvasZoomPercent((currentZoomPercent) =>
+                      clampRuntimeCanvasZoomPercent(
+                        currentZoomPercent - runtimeCanvasZoomPercentStep,
+                      ),
+                    )
+                  }
+                  title="Zoom out runtime canvas"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  className={`runtimeControl${isRuntimeCanvasDefaultView ? ' runtimeControlActive' : ''}`}
+                  onClick={() => {
+                    setRuntimeCanvasScaleMode('fit');
+                    setRuntimeCanvasZoomPercent(runtimeCanvasZoomPercentDefault);
+                  }}
+                  title="Reset runtime canvas view"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="runtimeControl"
+                  disabled={isRuntimeCanvasZoomInDisabled}
+                  onClick={() =>
+                    setRuntimeCanvasZoomPercent((currentZoomPercent) =>
+                      clampRuntimeCanvasZoomPercent(
+                        currentZoomPercent + runtimeCanvasZoomPercentStep,
+                      ),
+                    )
+                  }
+                  title="Zoom in runtime canvas"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
           {dashboardNotice ? <p className="callout">{dashboardNotice}</p> : null}
@@ -1032,7 +1103,7 @@ function App() {
                 <div className="runtimeCanvasHeader">
                   {runtimeCanvasLabel ? <p className="runtimeCanvasMeta">{runtimeCanvasLabel}</p> : null}
                   <p className="runtimeMeta">
-                    View: {runtimeCanvasScaleModes.find((mode) => mode.id === runtimeCanvasScaleMode)?.label}
+                    View: {runtimeCanvasScaleModes.find((mode) => mode.id === runtimeCanvasScaleMode)?.label} · Zoom {runtimeCanvasZoomLabel}
                   </p>
                 </div>
                 <div className="runtimeCanvasScroller">

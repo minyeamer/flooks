@@ -517,6 +517,16 @@ h1 {
   box-shadow: 0 14px 24px rgba(24, 34, 45, 0.08);
 }
 
+.runtimeControl:disabled,
+.runtimeControl:disabled:hover {
+  transform: none;
+  border-color: rgba(24, 34, 45, 0.08);
+  background: rgba(24, 34, 45, 0.04);
+  color: rgba(91, 104, 115, 0.56);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 .runtimeControlActive {
   border-color: rgba(15, 118, 110, 0.24);
   background: var(--accent-soft);
