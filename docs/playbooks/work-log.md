@@ -751,3 +751,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## d4c39227 · Filter starter history
+
+Intent: make the recent starter action trail faster to inspect during failure triage by letting operators switch between the full trail and failure-only entries inside the same toolbar surface.
+
+What changed:
+- `apps/web/src/App.tsx` added a small starter history filter state with `All` and `Failed` modes.
+- `apps/web/src/App.tsx` now derives a filtered starter history list and automatically falls back to `All` if the user is looking at failed entries and the session no longer contains any failures.
+- `apps/web/src/App.tsx` renders compact filter pills in the starter history summary row and shows a small empty-state message when the current filter has no matching entries.
+- `apps/web/src/styles.css` added compact styling for the filter pills and filtered empty state.
+
+Functional result:
+- Operators can now isolate failed starter refresh attempts without losing the surrounding recent action trail entirely.
+- The filter stays inside the existing starter history surface, so failure triage is faster without introducing a larger navigation or modal flow.
+- If the session no longer contains any failures, the shell automatically returns to the full history view instead of leaving the user in an empty failed-only mode.
+
+Validation:
+- `npm run build:web`
