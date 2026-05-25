@@ -872,3 +872,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 424039a3 · Show relative starter history times
+
+Intent: make the starter history summary row faster to scan by showing how long ago the latest visible action and latest failure happened, while keeping exact timestamps available as hover detail.
+
+What changed:
+- `apps/web/src/App.tsx` now stores a machine-readable timestamp on each starter history entry and falls back to recovering that time from existing session entry IDs when older browser-session data is restored.
+- `apps/web/src/App.tsx` added relative-time formatting for starter history summary badges so the latest visible action and latest failure are shown as recency labels instead of only absolute timestamps.
+- `apps/web/src/App.tsx` keeps the exact formatted timestamp as the badge title so operators still have access to the precise time without expanding any history card.
+
+Functional result:
+- Operators can tell at a glance whether the visible starter activity happened seconds, minutes, or hours ago.
+- Existing browser-session history keeps working after reload because older saved entries can still recover a machine-readable timestamp from the persisted entry ID.
+- The starter history summary row now communicates both precise timing and scan-friendly recency without adding a new backend contract.
+
+Validation:
+- `npm run build:web`
