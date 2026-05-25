@@ -925,3 +925,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 1338f09c · Summarize dashboard runtime
+
+Intent: make the live dashboard preview read like a concrete product surface by surfacing the currently loaded dashboard, active page, panel count, and ownership state at the top of the runtime section.
+
+What changed:
+- `apps/web/src/App.tsx` now derives a dashboard runtime snapshot from the loaded dashboard document, active page, live runtime panel list, persisted version metadata, and owner state.
+- `apps/web/src/App.tsx` renders a new runtime summary strip above the toolbar so operators can see the dashboard title, source, active page, live panel count, library panel count, and ownership state before reading individual controls.
+- `apps/web/src/styles.css` added a responsive runtime snapshot grid and card styling so the summary stays readable on both desktop and narrow layouts.
+
+Functional result:
+- The live runtime section now reads more like an actual dashboard service surface instead of a loose collection of controls and panels.
+- Operators can tell which dashboard is loaded, how many live panels are on the active page, and whether they are looking at a persisted or starter-managed asset without scanning multiple lines of metadata.
+- The runtime preview gains an above-the-fold summary layer that better matches a real dashboard product shell.
+
+Validation:
+- `npm run build:web`
