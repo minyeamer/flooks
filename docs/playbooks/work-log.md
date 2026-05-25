@@ -465,3 +465,23 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## 05c16167 · Mixed panel runtime previews
+
+Intent: close the remaining visible gap in the runtime canvas by rendering the stored non-table panel kinds instead of falling back to placeholders.
+
+What changed:
+- `apps/web/src/App.tsx` added lightweight runtime renderers for `line`, `bar`, `pie`, and `notice` panels by reusing the existing governed query execution path and deriving chart inputs from the first dimension and metric in each panel query.
+- `apps/web/src/App.tsx` also updated the empty-state messaging so the runtime canvas now speaks in terms of placed panels rather than only scorecards and tables.
+- `apps/web/src/styles.css` added the chart and notice card presentation needed for inline line previews, bar tracks, pie legends, and notice fact tiles inside the existing canvas layout.
+- `packages/dashboard-schema/src/index.ts` expanded the shared starter dashboard document with mixed panel placements and new `bar`, `pie`, `line`, and `notice` library entries so new bootstrap documents exercise the richer renderer path.
+- `apps/api/app/domain/dashboard.py` mirrored the shared starter dashboard expansion in the backend bootstrap document builder, and `apps/api/tests/test_dashboards.py` updated the dashboard CRUD/bootstrap fixtures and assertions to cover the new panel mix while preserving the original panel ordering contract.
+
+Functional result:
+- The runtime preview can now render mixed dashboard pages with basic chart and notice surfaces instead of showing generic unsupported-kind placeholders.
+- Freshly bootstrapped dashboard documents now include a broader panel mix, which makes the shared starter experience closer to a real dashboard canvas.
+- The backend starter document and the frontend shared schema stay aligned for the expanded panel mix, and dashboard route tests continue to enforce that compatibility.
+
+Validation:
+- `npm run build:web`
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
