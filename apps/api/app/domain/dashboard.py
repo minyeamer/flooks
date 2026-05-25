@@ -151,3 +151,119 @@ class DashboardUpdateRequest(DashboardModel):
     status: DashboardVersionStatus = DashboardVersionStatus.DRAFT
     description: str | None = None
     document: DashboardDocument
+
+
+STARTER_DASHBOARD_ID = "db-home"
+STARTER_DASHBOARD_SLUG = "commerce-home"
+
+
+def build_starter_dashboard_document(
+    *,
+    version: int = 1,
+    title: str = "Commerce Executive Overview",
+    key: str = STARTER_DASHBOARD_SLUG,
+) -> DashboardDocument:
+    """Return the canonical starter dashboard document used for bootstrap flows."""
+
+    return DashboardDocument(
+        id=STARTER_DASHBOARD_ID,
+        key=key,
+        title=title,
+        version=version,
+        owner_role_boundary=SystemRole.ADMIN,
+        supported_data_sources=[DataSourceKind.POSTGRES],
+        pages=[
+            DashboardPage(
+                id="page-overview",
+                title="Overview",
+                width=1600,
+                height=900,
+                snap_grid=DashboardSnapGrid(column_width=20, row_height=20),
+                placements=[
+                    DashboardPanelPlacement(
+                        panel_id="panel-gmv",
+                        x=40,
+                        y=40,
+                        width=300,
+                        height=180,
+                        z_index=1,
+                    ),
+                    DashboardPanelPlacement(
+                        panel_id="panel-revenue",
+                        x=360,
+                        y=40,
+                        width=300,
+                        height=180,
+                        z_index=1,
+                    ),
+                    DashboardPanelPlacement(
+                        panel_id="panel-channel-table",
+                        x=40,
+                        y=240,
+                        width=920,
+                        height=320,
+                        z_index=1,
+                    ),
+                ],
+            )
+        ],
+        panel_library=[
+            DashboardPanelRef(
+                id="panel-gmv",
+                key="gmv-scorecard",
+                kind="scorecard",
+                title="GMV",
+                dataset_key="mart_commerce_daily",
+                by_reference=True,
+                query=DashboardPanelQuerySpec(
+                    dataset_key="mart_commerce_daily",
+                    dimensions=[],
+                    metrics=[DashboardPanelMetricSpec(key="gmv", aggregate=MetricAggregate.SUM)],
+                    limit=1,
+                ),
+                scorecard=DashboardScorecardPanelConfig(
+                    description="Total GMV returned by the governed query execution path.",
+                    value_field="gmv",
+                    value_prefix="$",
+                ),
+            ),
+            DashboardPanelRef(
+                id="panel-revenue",
+                key="revenue-scorecard",
+                kind="scorecard",
+                title="Revenue",
+                dataset_key="mart_commerce_daily",
+                by_reference=True,
+                query=DashboardPanelQuerySpec(
+                    dataset_key="mart_commerce_daily",
+                    dimensions=[],
+                    metrics=[DashboardPanelMetricSpec(key="revenue", aggregate=MetricAggregate.SUM)],
+                    limit=1,
+                ),
+                scorecard=DashboardScorecardPanelConfig(
+                    description="Net revenue total executed from the starter dashboard document.",
+                    value_field="revenue",
+                    value_prefix="$",
+                ),
+            ),
+            DashboardPanelRef(
+                id="panel-channel-table",
+                key="channel-revenue-table",
+                kind="table",
+                title="Revenue by Channel",
+                dataset_key="mart_commerce_daily",
+                by_reference=True,
+                query=DashboardPanelQuerySpec(
+                    dataset_key="mart_commerce_daily",
+                    dimensions=["channel_name"],
+                    metrics=[DashboardPanelMetricSpec(key="revenue", aggregate=MetricAggregate.SUM)],
+                    sort=[DashboardPanelSortSpec(field="revenue", direction=SortDirection.DESC)],
+                    limit=5,
+                ),
+                table=DashboardTablePanelConfig(
+                    description="Top channels ranked by revenue from the live governed query response.",
+                    columns=["channel_name", "revenue"],
+                ),
+            ),
+        ],
+    )

@@ -233,7 +233,7 @@ async def get_api_reference() -> ApiReferenceResponse:
                 method="GET",
                 path=f"{api_prefix}/dashboards",
                 summary="List dashboards",
-                description="저장된 dashboard metadata와 최신 revision 상태를 요약해서 반환합니다.",
+                description="저장된 dashboard metadata와 최신 revision 상태를 요약해서 반환합니다. metadata store가 비어 있으면 starter dashboard를 한 번 bootstrap한 뒤 그 결과를 반환합니다.",
                 parameters=[],
                 responses=[
                     ApiResponseReference(
@@ -310,7 +310,7 @@ async def get_api_reference() -> ApiReferenceResponse:
                 method="GET",
                 path=f"{api_prefix}/dashboards/{{slug}}",
                 summary="Get dashboard",
-                description="최신 dashboard document 또는 특정 version의 document를 version history와 함께 반환합니다.",
+                description="최신 dashboard document 또는 특정 version의 document를 version history와 함께 반환합니다. metadata store가 아직 비어 있고 starter slug를 조회하면 starter dashboard를 먼저 bootstrap합니다.",
                 parameters=[
                     ApiFieldReference(name="slug", type="path string", description="조회할 dashboard slug입니다.", example="commerce-home"),
                     ApiFieldReference(name="version", type="query integer", description="선택적으로 조회할 revision 번호입니다. 생략하면 최신 revision을 반환합니다.", required=False, example=2),

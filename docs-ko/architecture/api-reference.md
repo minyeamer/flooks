@@ -115,6 +115,10 @@
 
 - 없음
 
+동작 메모:
+
+- metadata store가 아직 비어 있으면 backend가 canonical starter dashboard를 한 번 bootstrap한 뒤 목록 응답에 포함해 반환한다.
+
 응답 필드:
 
 - `[].id`: dashboard metadata UUID.
@@ -165,6 +169,10 @@
 
 - `slug`: path의 dashboard 식별자.
 - `version`: 선택적인 query parameter. 없으면 최신 revision을 반환한다.
+
+동작 메모:
+
+- metadata store가 아직 비어 있고 `slug`가 `commerce-home`이면 backend가 starter dashboard를 먼저 bootstrap한 뒤 응답을 반환한다.
 
 응답 필드:
 
@@ -287,4 +295,5 @@
 - Swagger와 ReDoc은 생성된 OpenAPI schema를 가장 빠르게 살펴보는 도구다.
 - structured reference endpoint는 web shell이 그대로 사용하므로 앱 안 문서가 backend 계약과 같이 움직인다.
 - dashboard CRUD와 versioned document persistence는 이제 metadata schema 위에서 실제 endpoint로 동작한다.
+- 비어 있는 dashboard store는 첫 dashboard list/detail read에서 canonical `commerce-home` starter dashboard를 lazy-bootstrap한다.
 - query execution은 이제 `POST /api/v1/query/execute`를 통해 동작하며, 현재 `POSTGRES` connector 경로를 사용한다.

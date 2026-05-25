@@ -115,6 +115,10 @@ Input parameters:
 
 - none
 
+Behavior notes:
+
+- When the metadata store is still empty, the backend first bootstraps the canonical starter dashboard and then returns it in the list response.
+
 Response fields:
 
 - `[].id`: dashboard metadata UUID.
@@ -165,6 +169,10 @@ Input parameters:
 
 - `slug`: dashboard identifier in the path.
 - `version`: optional query parameter. When omitted, the latest revision is returned.
+
+Behavior notes:
+
+- When the metadata store is still empty and `slug` is `commerce-home`, the backend bootstraps the starter dashboard before returning the response.
 
 Response fields:
 
@@ -287,4 +295,5 @@ Success response fields:
 - Swagger and ReDoc remain the fastest way to explore the generated OpenAPI schema.
 - The structured reference endpoint is the source used by the web shell, so the in-app documentation stays aligned with the backend contract.
 - Dashboard CRUD and versioned document persistence are now live on top of the metadata schema.
+- Empty dashboard stores now lazy-bootstrap the canonical `commerce-home` starter dashboard on the first dashboard list/detail read.
 - Query execution is now live through `POST /api/v1/query/execute` with the current `POSTGRES` connector path.

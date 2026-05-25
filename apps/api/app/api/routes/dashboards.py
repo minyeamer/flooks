@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from weakref import WeakSet
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -9,15 +11,19 @@ from sqlalchemy.orm import Session, selectinload
 from app.db.models import DashboardRecord, DashboardVersionRecord
 from app.db.session import get_db_session
 from app.domain.dashboard import (
+    STARTER_DASHBOARD_SLUG,
     DashboardCreateRequest,
     DashboardDocument,
     DashboardResponse,
     DashboardSummary,
     DashboardUpdateRequest,
     DashboardVersionSummary,
+    build_starter_dashboard_document,
 )
+from app.domain.persistence import DashboardVersionStatus, PrincipalKind
 
 router = APIRouter(tags=["dashboards"])
+_SEEDED_DASHBOARD_BINDS: WeakSet[object] = WeakSet()
 
 
 @router.get(
@@ -26,6 +32,8 @@ router = APIRouter(tags=["dashboards"])
     summary="List dashboards",
 )
 async def list_dashboards(session: Session = Depends(get_db_session)) -> list[DashboardSummary]:
+    _ensure_starter_dashboard_seeded(session)
+
     records = session.scalars(
         select(DashboardRecord)
         .options(selectinload(DashboardRecord.versions))
@@ -45,6 +53,7 @@ async def create_dashboard(
     request: DashboardCreateRequest,
     session: Session = Depends(get_db_session),
 ) -> DashboardResponse:
+    _mark_dashboard_store_initialized(session)
     _ensure_document_key_matches_slug(request.slug, request.document.key)
 
     existing_record = session.scalar(select(DashboardRecord.id).where(DashboardRecord.slug == request.slug))
@@ -101,6 +110,7 @@ async def update_dashboard(
     request: DashboardUpdateRequest,
     session: Session = Depends(get_db_session),
 ) -> DashboardResponse:
+    _mark_dashboard_store_initialized(session)
     _ensure_document_key_matches_slug(slug, request.document.key)
 
     dashboard_record = _get_dashboard_record(session, slug)
@@ -141,6 +151,7 @@ async def update_dashboard(
     summary="Delete dashboard",
 )
 async def delete_dashboard(slug: str, session: Session = Depends(get_db_session)) -> Response:
+    _mark_dashboard_store_initialized(session)
     dashboard_record = _get_dashboard_record(session, slug)
 
     session.delete(dashboard_record)
@@ -150,6 +161,8 @@ async def delete_dashboard(slug: str, session: Session = Depends(get_db_session)
 
 
 def _load_dashboard_response(session: Session, slug: str, version: int | None = None) -> DashboardResponse:
+    _ensure_starter_dashboard_seeded(session, slug)
+
     dashboard_record = _get_dashboard_record(session, slug)
     version_record = _get_version_record(dashboard_record, version)
 
@@ -239,3 +252,44 @@ def _ensure_document_key_matches_slug(slug: str, document_key: str) -> None:
                 "message": f"Dashboard document key '{document_key}' must match slug '{slug}'.",
             },
         )
+
+
+def _ensure_starter_dashboard_seeded(session: Session, slug: str | None = None) -> None:
+    bind = session.get_bind()
+    has_any_dashboards = session.scalar(select(DashboardRecord.id).limit(1)) is not None
+
+    if has_any_dashboards:
+        _SEEDED_DASHBOARD_BINDS.add(bind)
+        return
+
+    if bind in _SEEDED_DASHBOARD_BINDS:
+        return
+
+    if slug is not None and slug != STARTER_DASHBOARD_SLUG:
+        return
+
+    starter_document = build_starter_dashboard_document()
+    starter_version = DashboardVersionRecord(
+        version_number=1,
+        status=DashboardVersionStatus.DRAFT,
+        document=starter_document.model_dump(mode="json", by_alias=True),
+        summary="Bootstrap starter dashboard seeded automatically.",
+        created_by="system-bootstrap",
+    )
+    starter_record = DashboardRecord(
+        slug=STARTER_DASHBOARD_SLUG,
+        title=starter_document.title,
+        description="Starter executive dashboard seeded for the first runtime session.",
+        owner_principal_kind=PrincipalKind.USER,
+        owner_principal_key="system-bootstrap",
+        latest_version_number=1,
+        versions=[starter_version],
+    )
+
+    session.add(starter_record)
+    session.commit()
+    _SEEDED_DASHBOARD_BINDS.add(bind)
+
+
+def _mark_dashboard_store_initialized(session: Session) -> None:
+    _SEEDED_DASHBOARD_BINDS.add(session.get_bind())

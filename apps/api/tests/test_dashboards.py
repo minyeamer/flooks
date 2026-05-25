@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
 from app.db.session import get_db_session
+from app.domain.dashboard import STARTER_DASHBOARD_SLUG
 from app.main import app
 
 
@@ -76,7 +77,7 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
         "valuePrefix": "$",
         "valueSuffix": None,
     }
-    assert created_body["document"]["panelLibrary"][1]["table"] == {
+    assert created_body["document"]["panelLibrary"][2]["table"] == {
         "description": "Top channels by revenue from the stored dashboard document.",
         "columns": ["channel_name", "revenue"],
     }
@@ -109,7 +110,7 @@ def test_dashboard_crud_and_versioning(dashboard_client: TestClient) -> None:
     assert updated_body["latestVersionStatus"] == "published"
     assert [version["versionNumber"] for version in updated_body["versions"]] == [1, 2]
     assert updated_body["document"]["panelLibrary"][0]["scorecard"]["valueField"] == "gmv"
-    assert updated_body["document"]["panelLibrary"][1]["query"]["sort"] == [
+    assert updated_body["document"]["panelLibrary"][2]["query"]["sort"] == [
         {"field": "revenue", "direction": "desc"}
     ]
 
@@ -152,6 +153,35 @@ def test_dashboard_create_rejects_mismatched_document_key(dashboard_client: Test
     }
 
 
+def test_dashboard_list_bootstraps_starter_dashboard_when_store_is_empty(
+    dashboard_client: TestClient,
+) -> None:
+    response = dashboard_client.get("/api/v1/dashboards")
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert len(body) == 1
+    assert body[0]["slug"] == STARTER_DASHBOARD_SLUG
+    assert body[0]["latestVersionNumber"] == 1
+
+
+def test_dashboard_get_bootstraps_starter_dashboard_when_store_is_empty(
+    dashboard_client: TestClient,
+) -> None:
+    response = dashboard_client.get(f"/api/v1/dashboards/{STARTER_DASHBOARD_SLUG}")
+
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["slug"] == STARTER_DASHBOARD_SLUG
+    assert body["document"]["title"] == "Commerce Executive Overview"
+    assert body["document"]["panelLibrary"][0]["title"] == "GMV"
+    assert body["document"]["panelLibrary"][1]["title"] == "Revenue"
+    assert body["document"]["panelLibrary"][2]["title"] == "Revenue by Channel"
+    assert body["versions"][0]["createdBy"] == "system-bootstrap"
+
+
 def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key: str = "commerce-home") -> dict[str, object]:
     return {
         "id": "db-home",
@@ -171,6 +201,14 @@ def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key
                     {
                         "panelId": "panel-gmv",
                         "x": 40,
+                        "y": 40,
+                        "width": 300,
+                        "height": 180,
+                        "zIndex": 1,
+                    },
+                    {
+                        "panelId": "panel-revenue",
+                        "x": 360,
                         "y": 40,
                         "width": 300,
                         "height": 180,
@@ -204,6 +242,25 @@ def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key
                 "scorecard": {
                     "description": "Total GMV from the stored dashboard document.",
                     "valueField": "gmv",
+                    "valuePrefix": "$",
+                },
+            },
+            {
+                "id": "panel-revenue",
+                "key": "revenue-scorecard",
+                "kind": "scorecard",
+                "title": "Revenue",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": [],
+                    "metrics": [{"key": "revenue", "aggregate": "sum"}],
+                    "limit": 1,
+                },
+                "scorecard": {
+                    "description": "Net revenue total executed from the starter dashboard document.",
+                    "valueField": "revenue",
                     "valuePrefix": "$",
                 },
             },
