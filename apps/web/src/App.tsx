@@ -128,6 +128,17 @@ type RuntimePanelEntry = {
   placement: PanelPlacement;
 };
 
+type RuntimeChartDatum = {
+  label: string;
+  value: number;
+  formattedValue: string;
+};
+
+type RuntimeNoticeFact = {
+  label: string;
+  value: string;
+};
+
 type RuntimeCanvasScaleMode = 'fit' | 'detail';
 
 type RuntimeGridMetrics = {
@@ -172,6 +183,7 @@ const runtimeCanvasZoomPercentDefault = 100;
 const runtimeCanvasZoomPercentStep = 15;
 const runtimeCanvasZoomPercentMin = 85;
 const runtimeCanvasZoomPercentMax = 170;
+const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f'] as const;
 
 function isScorecardPanel(
   panel: PanelRef | undefined,
@@ -191,6 +203,22 @@ function isTablePanel(
   table: NonNullable<PanelRef['table']>;
 } {
   return panel?.kind === 'table' && panel.query != null && panel.table != null;
+}
+
+function isChartPanel(
+  panel: PanelRef | undefined,
+): panel is PanelRef & {
+  kind: 'line' | 'bar' | 'pie';
+  query: NonNullable<PanelRef['query']>;
+} {
+  return (
+    (panel?.kind === 'line' || panel?.kind === 'bar' || panel?.kind === 'pie') &&
+    panel.query != null
+  );
+}
+
+function isNoticePanel(panel: PanelRef | undefined): panel is PanelRef & { kind: 'notice' } {
+  return panel?.kind === 'notice';
 }
 
 const launchTracks = [
@@ -291,6 +319,107 @@ function formatScorecardValue(
 
 function formatPlacementLabel(placement: PanelPlacement): string {
   return `Placement ${placement.x},${placement.y} · ${placement.width}×${placement.height}`;
+}
+
+function getRuntimeChartData(
+  panel: PanelRef,
+  runtime: PanelRuntimeEntry | undefined,
+): RuntimeChartDatum[] {
+  if (panel.query == null || runtime?.state !== 'ready' || runtime.data == null) {
+    return [];
+  }
+
+  const metricField = panel.query.metrics[0]?.key;
+
+  if (metricField == null) {
+    return [];
+  }
+
+  const dimensionField = panel.query.dimensions[0];
+
+  return runtime.data.results.reduce<RuntimeChartDatum[]>((entries, row, index) => {
+    const rawMetricValue = row[metricField];
+    const numericValue =
+      typeof rawMetricValue === 'number'
+        ? rawMetricValue
+        : typeof rawMetricValue === 'string' && rawMetricValue.trim().length > 0
+          ? Number(rawMetricValue)
+          : null;
+
+    if (numericValue == null || !Number.isFinite(numericValue)) {
+      return entries;
+    }
+
+    const rawLabelValue = dimensionField != null ? row[dimensionField] : undefined;
+    const label =
+      typeof rawLabelValue === 'string' && rawLabelValue.length > 0
+        ? rawLabelValue
+        : rawLabelValue != null
+          ? String(rawLabelValue)
+          : `Row ${index + 1}`;
+
+    entries.push({
+      label,
+      value: numericValue,
+      formattedValue: formatQueryCellValue(rawMetricValue),
+    });
+
+    return entries;
+  }, []);
+}
+
+function getRuntimeNoticeFacts(runtime: PanelRuntimeEntry | undefined): RuntimeNoticeFact[] {
+  if (runtime?.state !== 'ready' || runtime.data == null) {
+    return [];
+  }
+
+  const firstRow = runtime.data.results[0];
+
+  if (firstRow == null) {
+    return [];
+  }
+
+  return runtime.data.columnNames.slice(0, 4).map((columnName) => ({
+    label: columnName,
+    value: formatQueryCellValue(firstRow[columnName]),
+  }));
+}
+
+function getRuntimeLineChartPath(chartData: RuntimeChartDatum[]): string {
+  if (chartData.length === 0) {
+    return '';
+  }
+
+  const maxValue = Math.max(...chartData.map((datum) => datum.value), 1);
+
+  return chartData
+    .map((datum, index) => {
+      const x = chartData.length === 1 ? 50 : 8 + (84 * index) / (chartData.length - 1);
+      const y = 90 - (datum.value / maxValue) * 68;
+
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+}
+
+function getRuntimePieChartBackground(chartData: RuntimeChartDatum[]): string {
+  const total = chartData.reduce((sum, datum) => sum + datum.value, 0);
+
+  if (total <= 0) {
+    return 'rgba(24, 34, 45, 0.08)';
+  }
+
+  let currentOffset = 0;
+
+  return `conic-gradient(${chartData
+    .map((datum, index) => {
+      const startOffset = (currentOffset / total) * 360;
+
+      currentOffset += datum.value;
+
+      return `${runtimeChartColors[index % runtimeChartColors.length]} ${startOffset.toFixed(2)}deg ${((currentOffset / total) * 360).toFixed(2)}deg`;
+    })
+    .join(', ')})`;
 }
 
 function formatRuntimeCanvasLabel(
@@ -1132,8 +1261,7 @@ function App() {
           <div className="runtimeLayout">
             {dashboardRuntimePanelEntries.length === 0 ? (
               <p className="callout">
-                The active dashboard document does not define any scorecard or table panels with a governed
-                query spec yet.
+                The active dashboard document does not define any placed runtime panels yet.
               </p>
             ) : (
               <div className="runtimeCanvasFrame">
@@ -1243,6 +1371,190 @@ function App() {
                               </p>
                             )}
                           </div>
+                        );
+                      }
+
+                      if (isChartPanel(panel)) {
+                        const chartData = getRuntimeChartData(panel, runtime);
+                        const metricLabel = panel.query.metrics[0]?.key ?? 'metric';
+                        const dimensionLabel = panel.query.dimensions[0] ?? 'row';
+                        const chartMaxValue = Math.max(...chartData.map((datum) => datum.value), 1);
+                        const pieTotalValue = chartData.reduce((sum, datum) => sum + datum.value, 0);
+                        const linePath = getRuntimeLineChartPath(chartData);
+
+                        return (
+                          <article className="runtimeCanvasItem runtimeChartCard" key={runtimePanelKey} style={runtimePanelStyle}>
+                            <div className="runtimeTableHeader">
+                              <span className="kicker">{panel.title}</span>
+                              <span className="queryBadge">
+                                {panel.kind} · {metricLabel}
+                              </span>
+                            </div>
+                            <p className="runtimeMeta">
+                              {panel.kind === 'line'
+                                ? `${metricLabel} trend grouped by ${dimensionLabel}`
+                                : `${metricLabel} grouped by ${dimensionLabel}`}
+                            </p>
+                            <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+
+                            {runtime?.state === 'ready' && chartData.length > 0 ? (
+                              panel.kind === 'line' ? (
+                                <>
+                                  <div className="runtimeLineChart">
+                                    <svg
+                                      aria-label={`${panel.title} line chart preview`}
+                                      className="runtimeLineSvg"
+                                      preserveAspectRatio="none"
+                                      viewBox="0 0 100 100"
+                                    >
+                                      <path className="runtimeLineAxis" d="M 6 90 H 94" />
+                                      <path className="runtimeLinePath" d={linePath} />
+                                      {chartData.map((datum, index) => {
+                                        const x =
+                                          chartData.length === 1 ? 50 : 8 + (84 * index) / (chartData.length - 1);
+                                        const y = 90 - (datum.value / chartMaxValue) * 68;
+
+                                        return (
+                                          <circle
+                                            className="runtimeLinePoint"
+                                            cx={x}
+                                            cy={y}
+                                            key={`${panel.id}-${datum.label}`}
+                                            r="2.6"
+                                          />
+                                        );
+                                      })}
+                                    </svg>
+                                  </div>
+                                  <div className="runtimeLineLabels">
+                                    {chartData.slice(0, 6).map((datum) => (
+                                      <span key={`${panel.id}-${datum.label}-label`}>{datum.label}</span>
+                                    ))}
+                                  </div>
+                                </>
+                              ) : panel.kind === 'bar' ? (
+                                <div className="runtimeBarChart">
+                                  {chartData.map((datum, index) => {
+                                    const ratio = `${Math.max(10, (datum.value / chartMaxValue) * 100)}%`;
+
+                                    return (
+                                      <div className="runtimeBarRow" key={`${panel.id}-${datum.label}`}>
+                                        <div className="runtimeBarLabelRow">
+                                          <span>{datum.label}</span>
+                                          <strong>{datum.formattedValue}</strong>
+                                        </div>
+                                        <div className="runtimeBarTrack">
+                                          <span
+                                            className="runtimeBarFill"
+                                            style={{
+                                              background: runtimeChartColors[index % runtimeChartColors.length],
+                                              width: ratio,
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="runtimePieLayout">
+                                  <div
+                                    aria-label={`${panel.title} pie chart preview`}
+                                    className="runtimePieChart"
+                                    style={{ background: getRuntimePieChartBackground(chartData) }}
+                                  >
+                                    <span>{formatQueryCellValue(pieTotalValue)}</span>
+                                  </div>
+                                  <div className="runtimePieLegend">
+                                    {chartData.map((datum, index) => {
+                                      const sharePercent = pieTotalValue > 0 ? (datum.value / pieTotalValue) * 100 : 0;
+
+                                      return (
+                                        <div className="runtimePieLegendItem" key={`${panel.id}-${datum.label}`}>
+                                          <span
+                                            className="runtimePieSwatch"
+                                            style={{ background: runtimeChartColors[index % runtimeChartColors.length] }}
+                                          />
+                                          <span className="runtimePieLabel">{datum.label}</span>
+                                          <strong>{sharePercent.toFixed(0)}%</strong>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )
+                            ) : runtime?.state === 'error' ? (
+                              <p className="callout calloutError">
+                                {runtime.errorMessage ?? `The ${panel.kind} panel could not be rendered yet.`}
+                              </p>
+                            ) : runtime?.state === 'ready' ? (
+                              <p className="callout">
+                                The {panel.kind} panel executed successfully, but the dataset returned no numeric series.
+                              </p>
+                            ) : (
+                              <p className="callout">
+                                Executing the active dashboard {panel.kind} panel against {API_BASE_URL}/query/execute
+                              </p>
+                            )}
+
+                            <p className="runtimeMeta">
+                              {runtime?.data?.rowCount != null
+                                ? `${runtime.data.rowCount} rows · ${runtime.data.executionMetadata.connector ?? 'POST /query/execute'}`
+                                : `${panel.datasetKey} · ${panel.query.limit ?? 0} row limit`}
+                            </p>
+                            <p className="runtimeMeta">
+                              {runtime?.data?.executionMetadata.durationMs != null
+                                ? `${runtime.data.executionMetadata.durationMs} ms`
+                                : 'Awaiting panel result'}
+                            </p>
+                          </article>
+                        );
+                      }
+
+                      if (isNoticePanel(panel)) {
+                        const noticeFacts = getRuntimeNoticeFacts(runtime);
+
+                        return (
+                          <article className="runtimeCanvasItem runtimeNoticeCard" key={runtimePanelKey} style={runtimePanelStyle}>
+                            <div className="runtimeTableHeader">
+                              <span className="kicker">{panel.title}</span>
+                              <span className="queryBadge">notice</span>
+                            </div>
+                            {runtime?.state === 'ready' && noticeFacts.length > 0 ? (
+                              <>
+                                <p className="runtimeNoticeLead">
+                                  Live notice facts are sourced from the first governed query row.
+                                </p>
+                                <div className="runtimeNoticeGrid">
+                                  {noticeFacts.map((fact) => (
+                                    <div className="runtimeNoticeFact" key={`${panel.id}-${fact.label}`}>
+                                      <span>{fact.label}</span>
+                                      <strong>{fact.value}</strong>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            ) : runtime?.state === 'error' ? (
+                              <p className="callout calloutError">
+                                {runtime.errorMessage ?? 'The notice panel could not load its summary data.'}
+                              </p>
+                            ) : panel.query != null ? (
+                              <p className="callout">
+                                Executing the active dashboard notice panel against {API_BASE_URL}/query/execute
+                              </p>
+                            ) : (
+                              <p className="runtimeNoticeLead">
+                                Static notice panels can hold rollout guidance or alert copy even before a live query is attached.
+                              </p>
+                            )}
+                            <p className="runtimeMeta">{panel.datasetKey}</p>
+                            {runtime?.data != null ? (
+                              <p className="runtimeMeta">
+                                {runtime.data.rowCount} rows · {runtime.data.executionMetadata.connector ?? 'POST /query/execute'}
+                              </p>
+                            ) : null}
+                            <p className="runtimeMeta">{formatPlacementLabel(placement)}</p>
+                          </article>
                         );
                       }
 

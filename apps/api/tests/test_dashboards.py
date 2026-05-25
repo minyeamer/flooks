@@ -179,6 +179,10 @@ def test_dashboard_get_bootstraps_starter_dashboard_when_store_is_empty(
     assert body["document"]["panelLibrary"][0]["title"] == "GMV"
     assert body["document"]["panelLibrary"][1]["title"] == "Revenue"
     assert body["document"]["panelLibrary"][2]["title"] == "Revenue by Channel"
+    assert body["document"]["panelLibrary"][3]["title"] == "Revenue Mix by Channel"
+    assert body["document"]["panelLibrary"][4]["title"] == "Orders Share by Channel"
+    assert body["document"]["panelLibrary"][5]["title"] == "Revenue Trend"
+    assert body["document"]["panelLibrary"][6]["title"] == "Operations Notice"
     assert body["versions"][0]["createdBy"] == "system-bootstrap"
 
 
@@ -215,11 +219,43 @@ def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key
                         "zIndex": 1,
                     },
                     {
+                        "panelId": "panel-ops-notice",
+                        "x": 680,
+                        "y": 40,
+                        "width": 880,
+                        "height": 180,
+                        "zIndex": 1,
+                    },
+                    {
                         "panelId": "panel-channel-table",
                         "x": 40,
                         "y": 240,
-                        "width": 920,
-                        "height": 320,
+                        "width": 720,
+                        "height": 260,
+                        "zIndex": 1,
+                    },
+                    {
+                        "panelId": "panel-channel-bar",
+                        "x": 780,
+                        "y": 240,
+                        "width": 360,
+                        "height": 260,
+                        "zIndex": 1,
+                    },
+                    {
+                        "panelId": "panel-channel-pie",
+                        "x": 1160,
+                        "y": 240,
+                        "width": 400,
+                        "height": 260,
+                        "zIndex": 1,
+                    },
+                    {
+                        "panelId": "panel-revenue-trend",
+                        "x": 40,
+                        "y": 520,
+                        "width": 1520,
+                        "height": 280,
                         "zIndex": 1,
                     }
                 ],
@@ -281,6 +317,66 @@ def _build_dashboard_document(*, version: int, title: str = "Commerce Home", key
                 "table": {
                     "description": "Top channels by revenue from the stored dashboard document.",
                     "columns": ["channel_name", "revenue"],
+                },
+            },
+            {
+                "id": "panel-channel-bar",
+                "key": "channel-revenue-bar",
+                "kind": "bar",
+                "title": "Revenue Mix by Channel",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": ["channel_name"],
+                    "metrics": [{"key": "revenue", "aggregate": "sum"}],
+                    "sort": [{"field": "revenue", "direction": "desc"}],
+                    "limit": 5,
+                },
+            },
+            {
+                "id": "panel-channel-pie",
+                "key": "channel-orders-pie",
+                "kind": "pie",
+                "title": "Orders Share by Channel",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": ["channel_name"],
+                    "metrics": [{"key": "orders", "aggregate": "sum"}],
+                    "sort": [{"field": "orders", "direction": "desc"}],
+                    "limit": 5,
+                },
+            },
+            {
+                "id": "panel-revenue-trend",
+                "key": "revenue-trend-line",
+                "kind": "line",
+                "title": "Revenue Trend",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": ["order_date"],
+                    "metrics": [{"key": "revenue", "aggregate": "sum"}],
+                    "sort": [{"field": "order_date", "direction": "asc"}],
+                    "limit": 7,
+                },
+            },
+            {
+                "id": "panel-ops-notice",
+                "key": "ops-notice",
+                "kind": "notice",
+                "title": "Operations Notice",
+                "datasetKey": "mart_commerce_daily",
+                "byReference": True,
+                "query": {
+                    "datasetKey": "mart_commerce_daily",
+                    "dimensions": ["channel_name"],
+                    "metrics": [{"key": "orders", "aggregate": "sum"}],
+                    "sort": [{"field": "orders", "direction": "desc"}],
+                    "limit": 1,
                 },
             }
         ],
