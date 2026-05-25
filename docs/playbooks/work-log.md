@@ -305,3 +305,36 @@ What changed:
 Functional result:
 - The repository now has a persistent implementation history that explains delivered behavior commit by commit.
 - Future work-log updates are constrained by repo instructions instead of depending on ad hoc chat behavior.
+
+## f45f7ede · Full-history work-log expansion
+
+Intent: fix the first saved work log so it no longer skipped the repository's earliest commits and so the heading format matched the stricter 8-character hash rule.
+
+What changed:
+- `docs/playbooks/work-log.md` was expanded backward to include the initial license commit, the first monorepo/bootstrap commit, the identity bootstrap API commit, and the early docs/style alignment commit.
+- `docs/playbooks/work-log.md` also converted all section headings from 7-character hashes to 8-character hashes so the file used one consistent identifier length.
+- `AGENTS.md` and `.github/copilot-instructions.md` were tightened again to require the 8-character hash format in future work-log headings.
+
+Functional result:
+- The canonical work log now starts at the real repository beginning instead of the metadata phase.
+- Future log maintenance is less ambiguous because the expected hash width is part of the repository instructions.
+
+## 5ae6e10d · Starter dashboard bootstrap for empty stores
+
+Intent: remove the need for the web shell to fall back to a client-only starter document on first run by making the backend supply a persisted starter dashboard automatically when the metadata store is still empty.
+
+What changed:
+- `apps/api/app/domain/dashboard.py` added `STARTER_DASHBOARD_ID`, `STARTER_DASHBOARD_SLUG`, and `build_starter_dashboard_document()`, which mirrors the canonical `commerce-home` starter dashboard with its page layout, two scorecards, and one table panel.
+- `apps/api/app/api/routes/dashboards.py` added lazy starter seeding for the dashboard list/detail read paths. When the metadata store is empty, the backend now inserts the starter dashboard before returning `/api/v1/dashboards` or `/api/v1/dashboards/commerce-home`.
+- `apps/api/app/api/routes/dashboards.py` also tracks per-bind initialization so explicit CRUD activity, including delete, does not immediately resurrect the starter dashboard in the same runtime.
+- `apps/api/tests/test_dashboards.py` added coverage for the new bootstrap behavior on empty stores and updated the dashboard fixture payload so the stored test document matches the current starter panel layout.
+- `apps/api/app/api/routes/reference.py`, `docs/architecture/api-reference.md`, and `docs-ko/architecture/api-reference.md` now describe the lazy starter bootstrap behavior for dashboard list/detail reads.
+
+Functional result:
+- A fresh metadata database can now serve a persisted `commerce-home` dashboard without requiring a manual create step first.
+- The web shell's persisted-dashboard path has a backend document to load on first run instead of dropping straight into the client fallback.
+- Explicit delete behavior still behaves like a delete inside the active runtime instead of re-creating the dashboard on the very next read.
+
+Validation:
+- `PYTHONPATH=apps/api python3 -m pytest apps/api/tests/test_dashboards.py`
+- `python3 -m compileall apps/api/app apps/api/tests`
