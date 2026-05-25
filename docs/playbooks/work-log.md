@@ -804,3 +804,20 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## c444a216 · Persist starter history filter
+
+Intent: keep the starter history triage view stable across browser reloads so operators can return to the same filtered action-kind slice without reapplying the toolbar filter manually.
+
+What changed:
+- `apps/web/src/App.tsx` added a small session-storage key and loader for the starter history filter selection.
+- `apps/web/src/App.tsx` now initializes the starter history filter from browser session storage, validates stored values against the supported filter set, and falls back to `All` when the saved value is missing or invalid.
+- `apps/web/src/App.tsx` also persists filter changes back into browser session storage and clears the saved value when the filter returns to `All`.
+
+Functional result:
+- Operators can reload the shell and stay in the same starter history filter mode for the current browser session.
+- Invalid or stale stored filter values degrade safely back to the default full-history view.
+- The starter history filter now behaves consistently with the existing session-persisted recent-action trail.
+
+Validation:
+- `npm run build:web`
