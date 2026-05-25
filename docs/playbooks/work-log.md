@@ -576,3 +576,21 @@ Functional result:
 
 Validation:
 - `npm run build:web`
+
+## d64ff17e · Starter action history
+
+Intent: make the starter refresh surface easier to operate over time by leaving a short in-session trail of recent refresh outcomes instead of only showing the latest badge and notice.
+
+What changed:
+- `apps/web/src/App.tsx` added a small session-local starter action history state and helper so each refresh success or failure is recorded with a summary, detail line, timestamp, and tone.
+- `apps/web/src/App.tsx` now records success entries for created, refreshed, and already-aligned starter checks, and records failure entries when the refresh request returns an error.
+- `apps/web/src/App.tsx` renders the recent starter action list directly under the existing starter status block so operators can review the last few refresh attempts without leaving the runtime surface.
+- `apps/web/src/styles.css` added compact card styling for the recent action list, including a separate error presentation so failed refresh attempts stand out from successful ones.
+
+Functional result:
+- Operators can now see a short recent history of starter refresh attempts instead of only the most recent notice text.
+- The shell preserves enough context to distinguish successful creation, real refreshes, no-op alignment checks, and failed attempts during the current session.
+- Recent refresh history stays close to the starter status metadata, which makes the operator workflow easier to follow from one place in the toolbar.
+
+Validation:
+- `npm run build:web`
