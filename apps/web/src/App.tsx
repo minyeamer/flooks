@@ -146,12 +146,15 @@ type StarterRefreshOutcome = 'created' | 'refreshed' | 'aligned' | null;
 
 type StarterRefreshHistoryTone = 'success' | 'error';
 
+type StarterRefreshHistoryKind = 'created' | 'refreshed' | 'aligned' | 'failed';
+
 type StarterRefreshHistoryEntry = {
   id: string;
   summary: string;
   detail: string;
   timestampLabel: string;
   tone: StarterRefreshHistoryTone;
+  actionKind: StarterRefreshHistoryKind | null;
   contextLabels: string[];
 };
 
@@ -208,6 +211,46 @@ const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f
 const starterDashboardBootstrapOwnerKey = 'system-bootstrap';
 const starterRefreshHistoryStorageKey = 'flooks.starter-refresh-history';
 
+function inferStarterRefreshHistoryKind(
+  summary: string,
+  tone: StarterRefreshHistoryTone,
+): StarterRefreshHistoryKind | null {
+  if (tone === 'error') {
+    return 'failed';
+  }
+
+  if (summary === 'Created starter persistence') {
+    return 'created';
+  }
+
+  if (summary === 'Refreshed starter seed') {
+    return 'refreshed';
+  }
+
+  if (summary === 'Starter already aligned') {
+    return 'aligned';
+  }
+
+  return null;
+}
+
+function getStarterRefreshHistoryKindLabel(
+  actionKind: StarterRefreshHistoryKind | null,
+): string | null {
+  switch (actionKind) {
+    case 'created':
+      return 'Created';
+    case 'refreshed':
+      return 'Refreshed';
+    case 'aligned':
+      return 'Aligned';
+    case 'failed':
+      return 'Failed';
+    default:
+      return null;
+  }
+}
+
 function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
   if (typeof window === 'undefined') {
     return [];
@@ -249,6 +292,14 @@ function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
           const contextLabels = rawContextLabels
             .filter((label): label is string => typeof label === 'string')
             .slice(0, 3);
+          const actionKind =
+            'actionKind' in entry &&
+            (entry.actionKind === 'created' ||
+              entry.actionKind === 'refreshed' ||
+              entry.actionKind === 'aligned' ||
+              entry.actionKind === 'failed')
+              ? entry.actionKind
+              : inferStarterRefreshHistoryKind(entry.summary, entry.tone);
 
           return [
             {
@@ -257,6 +308,7 @@ function loadStarterRefreshHistory(): StarterRefreshHistoryEntry[] {
               detail: entry.detail,
               timestampLabel: entry.timestampLabel,
               tone: entry.tone,
+              actionKind,
               contextLabels,
             } satisfies StarterRefreshHistoryEntry,
           ];
@@ -801,6 +853,7 @@ function App() {
     summary: string,
     detail: string,
     tone: StarterRefreshHistoryTone,
+    actionKind: StarterRefreshHistoryKind | null,
     contextLabels: string[] = [],
   ): void {
     const timestampLabel = dateTimeFormatter.format(new Date());
@@ -812,6 +865,7 @@ function App() {
         detail,
         timestampLabel,
         tone,
+        actionKind,
         contextLabels: contextLabels.slice(0, 3),
       },
       ...currentHistory,
@@ -923,6 +977,12 @@ function App() {
           : payload.latestVersionNumber > previousPersistedVersion
             ? 'Refreshed starter seed'
             : 'Starter already aligned';
+      const historyActionKind =
+        previousPersistedVersion == null
+          ? 'created'
+          : payload.latestVersionNumber > previousPersistedVersion
+            ? 'refreshed'
+            : 'aligned';
       const historyDetail =
         previousPersistedVersion == null
           ? `Persisted the canonical starter as version ${payload.latestVersionNumber}.`
@@ -948,6 +1008,7 @@ function App() {
         historySummary,
         historyDetail,
         'success',
+        historyActionKind,
         buildStarterRefreshHistoryContextLabels({
           versionNumber: payload.latestVersionNumber,
           versionStatus: payload.latestVersionStatus,
@@ -963,6 +1024,7 @@ function App() {
           ? error.message
           : `Unable to refresh starter dashboard '${starterDashboard.key}'.`,
         'error',
+        'failed',
         buildStarterRefreshHistoryContextLabels({
           versionNumber: persistedDashboardVersion,
           versionStatus: persistedDashboardVersionStatus,
@@ -1584,7 +1646,16 @@ function App() {
                         key={entry.id}
                       >
                         <div className="runtimeStarterHistoryHeader">
-                          <strong>{entry.summary}</strong>
+                          <div className="runtimeStarterHistoryHeadline">
+                            {entry.actionKind ? (
+                              <span
+                                className={`runtimeStarterHistoryBadge runtimeStarterHistoryBadge${entry.actionKind[0].toUpperCase()}${entry.actionKind.slice(1)}`}
+                              >
+                                {getStarterRefreshHistoryKindLabel(entry.actionKind)}
+                              </span>
+                            ) : null}
+                            <strong>{entry.summary}</strong>
+                          </div>
                           <span>{entry.timestampLabel}</span>
                         </div>
                         <p>{entry.detail}</p>
