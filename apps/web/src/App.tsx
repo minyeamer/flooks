@@ -98,6 +98,7 @@ type DashboardApiResponse = {
   slug: string;
   title: string;
   latestVersionNumber: number;
+  ownerPrincipalKey: string;
   document: DashboardDocument;
 };
 
@@ -184,6 +185,7 @@ const runtimeCanvasZoomPercentStep = 15;
 const runtimeCanvasZoomPercentMin = 85;
 const runtimeCanvasZoomPercentMax = 170;
 const runtimeChartColors = ['#0f766e', '#d97706', '#2563eb', '#be123c', '#4d7c0f'] as const;
+const starterDashboardBootstrapOwnerKey = 'system-bootstrap';
 
 function isScorecardPanel(
   panel: PanelRef | undefined,
@@ -628,6 +630,9 @@ function App() {
   );
   const [dashboardSourceLabel, setDashboardSourceLabel] = useState<string>('Starter seed');
   const [dashboardNotice, setDashboardNotice] = useState<string | null>(null);
+  const [dashboardNoticeTone, setDashboardNoticeTone] = useState<'default' | 'error' | 'success'>('default');
+  const [persistedDashboardVersion, setPersistedDashboardVersion] = useState<number | null>(null);
+  const [dashboardOwnerPrincipalKey, setDashboardOwnerPrincipalKey] = useState<string | null>(null);
   const [runtimeCanvasScaleMode, setRuntimeCanvasScaleMode] =
     useState<RuntimeCanvasScaleMode>('fit');
   const [runtimeCanvasZoomPercent, setRuntimeCanvasZoomPercent] = useState<number>(
@@ -643,11 +648,23 @@ function App() {
   function applyDashboardPayload(payload: DashboardApiResponse): void {
     setDashboardDocument(payload.document);
     setDashboardSourceLabel(`Persisted v${payload.latestVersionNumber}`);
+    setPersistedDashboardVersion(payload.latestVersionNumber);
+    setDashboardOwnerPrincipalKey(payload.ownerPrincipalKey);
+  }
+
+  function applyStarterSeedFallback(notice: string, tone: 'default' | 'error'): void {
+    setDashboardDocument(starterDashboard);
+    setDashboardSourceLabel('Starter seed');
+    setPersistedDashboardVersion(null);
+    setDashboardOwnerPrincipalKey(null);
+    setDashboardNotice(notice);
+    setDashboardNoticeTone(tone);
   }
 
   async function loadDashboardDocument(signal?: AbortSignal): Promise<void> {
     try {
       setDashboardNotice(null);
+      setDashboardNoticeTone('default');
 
       const response = await fetch(`${API_BASE_URL}/dashboards/${starterDashboard.key}`, {
         signal,
@@ -658,10 +675,9 @@ function App() {
           return;
         }
 
-        setDashboardDocument(starterDashboard);
-        setDashboardSourceLabel('Starter seed');
-        setDashboardNotice(
+        applyStarterSeedFallback(
           `Persisted dashboard '${starterDashboard.key}' was not found yet. Using the starter document.`,
+          'default',
         );
         return;
       }
@@ -687,20 +703,22 @@ function App() {
         return;
       }
 
-      setDashboardDocument(starterDashboard);
-      setDashboardSourceLabel('Starter seed');
-      setDashboardNotice(
+      applyStarterSeedFallback(
         error instanceof Error
           ? error.message
           : `Unable to load dashboard '${starterDashboard.key}'. Using the starter document instead.`,
+        'error',
       );
     }
   }
 
   async function handleRefreshStarterDashboard(): Promise<void> {
+    const previousPersistedVersion = persistedDashboardVersion;
+
     try {
       setIsRefreshingStarterDashboard(true);
       setDashboardNotice(null);
+      setDashboardNoticeTone('default');
 
       const response = await fetch(
         `${API_BASE_URL}/dashboards/${starterDashboard.key}/refresh-starter`,
@@ -725,14 +743,20 @@ function App() {
 
       applyDashboardPayload(payload);
       setDashboardNotice(
-        `Starter dashboard '${payload.slug}' is now available as persisted version ${payload.latestVersionNumber}.`,
+        previousPersistedVersion == null
+          ? `Starter dashboard '${payload.slug}' is now persisted as version ${payload.latestVersionNumber}.`
+          : payload.latestVersionNumber > previousPersistedVersion
+            ? `Starter dashboard '${payload.slug}' refreshed to persisted version ${payload.latestVersionNumber}.`
+            : `Starter dashboard '${payload.slug}' is already aligned at persisted version ${payload.latestVersionNumber}.`,
       );
+      setDashboardNoticeTone('success');
     } catch (error) {
       setDashboardNotice(
         error instanceof Error
           ? error.message
           : `Unable to refresh starter dashboard '${starterDashboard.key}'.`,
       );
+      setDashboardNoticeTone('error');
     } finally {
       setIsRefreshingStarterDashboard(false);
     }
@@ -933,6 +957,25 @@ function App() {
   const liveModules = system?.modules ?? [];
   const activeDashboardPage = getActiveDashboardPage(dashboardDocument, activePageId);
   const dashboardRuntimePanelEntries = getDashboardRuntimePanelEntries(dashboardDocument, activePageId);
+  const isPersistedStarterDashboard = persistedDashboardVersion != null;
+  const isBootstrapManagedStarterDashboard =
+    isPersistedStarterDashboard && dashboardOwnerPrincipalKey === starterDashboardBootstrapOwnerKey;
+  const isUserManagedStarterDashboard =
+    isPersistedStarterDashboard && dashboardOwnerPrincipalKey !== starterDashboardBootstrapOwnerKey;
+  const starterDashboardStatusLabel = !isPersistedStarterDashboard
+    ? 'Starter seed only'
+    : isBootstrapManagedStarterDashboard
+      ? `Bootstrap-managed v${persistedDashboardVersion}`
+      : `User-managed v${persistedDashboardVersion}`;
+  const starterDashboardStatusMessage = !isPersistedStarterDashboard
+    ? 'Refresh starter will persist the canonical mixed-panel starter dashboard into the metadata store.'
+    : isBootstrapManagedStarterDashboard
+      ? 'The backend can refresh this starter dashboard because it is still owned by system-bootstrap.'
+      : 'Refresh starter is disabled because the persisted starter dashboard is now user-managed.';
+  const isStarterRefreshDisabled = isRefreshingStarterDashboard || isUserManagedStarterDashboard;
+  const refreshStarterTitle = isUserManagedStarterDashboard
+    ? 'User-managed starter dashboards cannot be refreshed from the canonical seed.'
+    : 'Create or refresh the canonical starter dashboard';
   const runtimeGridMetrics = activeDashboardPage ? getRuntimeGridMetrics(activeDashboardPage) : null;
   const runtimeCanvasScaleFactor = getRuntimeCanvasScaleFactor(
     runtimeCanvasScaleMode,
@@ -1246,15 +1289,23 @@ function App() {
                   placements
                 </p>
               ) : null}
+              <div className="runtimeStarterStatus">
+                <span
+                  className={`runtimeStatusPill${isUserManagedStarterDashboard ? ' runtimeStatusPillProtected' : isPersistedStarterDashboard ? ' runtimeStatusPillManaged' : ''}`}
+                >
+                  Starter: {starterDashboardStatusLabel}
+                </span>
+                <p className="runtimeMeta">{starterDashboardStatusMessage}</p>
+              </div>
               <div className="runtimeControlGroup" aria-label="Starter dashboard actions">
                 <button
                   type="button"
                   className="runtimeControl"
-                  disabled={isRefreshingStarterDashboard}
+                  disabled={isStarterRefreshDisabled}
                   onClick={() => {
                     void handleRefreshStarterDashboard();
                   }}
-                  title="Create or refresh the canonical starter dashboard"
+                  title={refreshStarterTitle}
                 >
                   {isRefreshingStarterDashboard ? 'Refreshing starter...' : 'Refresh starter'}
                 </button>
@@ -1302,7 +1353,13 @@ function App() {
               </div>
             </div>
           </div>
-          {dashboardNotice ? <p className="callout">{dashboardNotice}</p> : null}
+          {dashboardNotice ? (
+            <p
+              className={`callout${dashboardNoticeTone === 'error' ? ' calloutError' : dashboardNoticeTone === 'success' ? ' calloutSuccess' : ''}`}
+            >
+              {dashboardNotice}
+            </p>
+          ) : null}
           {dashboardDocument.pages.length > 1 ? (
             <div className="pageSelector" aria-label="Dashboard pages">
               {dashboardDocument.pages.map((page) => (

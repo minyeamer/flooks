@@ -254,6 +254,12 @@ h1 {
   color: #9a3412;
 }
 
+.calloutSuccess {
+  border-color: rgba(15, 118, 110, 0.22);
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f766e;
+}
+
 .stepList {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -487,6 +493,38 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
+}
+
+.runtimeStarterStatus {
+  display: grid;
+  gap: 6px;
+}
+
+.runtimeStatusPill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(24, 34, 45, 0.08);
+  background: rgba(24, 34, 45, 0.04);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.runtimeStatusPillManaged {
+  border-color: rgba(15, 118, 110, 0.2);
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--accent);
+}
+
+.runtimeStatusPillProtected {
+  border-color: rgba(154, 52, 18, 0.18);
+  background: rgba(154, 52, 18, 0.08);
+  color: #9a3412;
 }
 
 .runtimeControlGroup {
