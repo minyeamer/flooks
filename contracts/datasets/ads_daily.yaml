@@ -1,0 +1,31 @@
+version: 1
+key: ads_daily
+label: 광고 일별 리포트
+connector: analytics-postgres
+source:
+  kind: table_function
+  identifier: analytics.adreport_daily
+  parameters: [timeRange.start, timeRange.end]
+dimensions:
+  - {key: platform_name, label: 플랫폼, type: string, column: platform_name, filterOperators: [eq, in, contains, isNull]}
+  - {key: account_name, label: 계정, type: string, column: account_name, filterOperators: [eq, in, contains, isNull]}
+  - {key: campaign_name, label: 캠페인, type: string, column: campaign_name, filterOperators: [eq, in, contains, isNull]}
+  - {key: adgroup_name, label: 광고그룹, type: string, column: adgroup_name, filterOperators: [eq, in, contains, isNull]}
+  - {key: ad_name, label: 광고, type: string, column: ad_name, filterOperators: [eq, in, contains, isNull]}
+  - {key: ad_type, label: 광고유형, type: string, column: ad_type, filterOperators: [eq, in, contains, isNull]}
+  - {key: product_id, label: 상품 ID, type: string, column: product_id, filterOperators: [eq, in, contains, isNull]}
+  - {key: team_name, label: 팀, type: string, column: team_name, filterOperators: [eq, in, contains, isNull]}
+  - {key: brand_name, label: 브랜드, type: string, column: brand_name, filterOperators: [eq, in, contains, isNull]}
+  - {key: category_name1, label: 대분류, type: string, column: category_name1, filterOperators: [eq, in, contains, isNull]}
+  - {key: category_name2, label: 중분류, type: string, column: category_name2, filterOperators: [eq, in, contains, isNull]}
+  - {key: category_name3, label: 소분류, type: string, column: category_name3, filterOperators: [eq, in, contains, isNull]}
+  - {key: category_name4, label: 세분류, type: string, column: category_name4, filterOperators: [eq, in, contains, isNull]}
+  - {key: color, label: 색상, type: string, column: color, filterOperators: [eq, in, contains, isNull]}
+  - {key: product_name, label: 상품명, type: string, column: product_name, filterOperators: [eq, in, contains, isNull]}
+  - {key: ymd, label: 날짜, type: date, column: ymd, filterOperators: [eq, between]}
+metrics:
+  - {key: ad_cost, label: 광고비, type: sum, column: ad_cost, format: currency}
+  - {key: conv_amount, label: 전환액, type: sum, column: conv_amount, format: currency}
+  - {key: roas, label: ROAS, type: ratio, numerator: conv_amount, denominator: ad_cost, format: percent}
+limits: {defaultRows: 100, maxRows: 500, timeoutSeconds: 15}
+cache: {ttlSeconds: 300}

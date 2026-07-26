@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flooks.io/schema/dataset-manifest-v1.json",
+  "type": "object",
+  "required": ["version", "key", "label", "connector", "source", "dimensions", "metrics", "limits", "cache"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": 1},
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "label": {"type": "string"},
+    "connector": {"type": "string"},
+    "source": {
+      "type": "object",
+      "required": ["kind", "identifier"],
+      "properties": {
+        "kind": {"enum": ["table", "table_function"]},
+        "identifier": {"type": "string"},
+        "parameters": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "dimensions": {"type": "array", "items": {"$ref": "#/$defs/field"}},
+    "metrics": {"type": "array", "items": {"$ref": "#/$defs/metric"}},
+    "limits": {
+      "type": "object",
+      "required": ["defaultRows", "maxRows", "timeoutSeconds"],
+      "properties": {
+        "defaultRows": {"type": "integer", "minimum": 1},
+        "maxRows": {"type": "integer", "minimum": 1},
+        "timeoutSeconds": {"type": "integer", "minimum": 1}
+      }
+    },
+    "cache": {
+      "type": "object",
+      "required": ["ttlSeconds"],
+      "properties": {"ttlSeconds": {"type": "integer", "minimum": 0}}
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "required": ["key", "label", "type", "column", "filterOperators"],
+      "properties": {
+        "key": {"type": "string"},
+        "label": {"type": "string"},
+        "type": {"enum": ["string", "date", "number"]},
+        "column": {"type": "string"},
+        "filterOperators": {"type": "array", "items": {"enum": ["eq", "in", "contains", "between", "isNull"]}}
+      }
+    },
+    "metric": {
+      "type": "object",
+      "required": ["key", "label", "type"],
+      "properties": {
+        "key": {"type": "string"},
+        "label": {"type": "string"},
+        "type": {"enum": ["sum", "ratio"]},
+        "column": {"type": "string"},
+        "numerator": {"type": "string"},
+        "denominator": {"type": "string"},
+        "format": {"enum": ["number", "currency", "percent"]}
+      }
+    }
+  }
+}

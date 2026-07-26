@@ -1,0 +1,12 @@
+root = "."
+tmp_dir = "/tmp/flooks-air"
+
+[build]
+cmd = "go build -o /tmp/flooks-air/api ./cmd/api"
+bin = "/tmp/flooks-air/api"
+include_ext = ["go", "yaml"]
+exclude_dir = ["apps", "docs"]
+stop_on_error = true
+
+[log]
+time = true

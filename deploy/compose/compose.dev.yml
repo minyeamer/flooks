@@ -1,0 +1,28 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    working_dir: /src
+    volumes:
+      - ../..:/src
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      DATASET_MANIFEST_DIR: /src/contracts/datasets
+
+  web:
+    image: node:24-alpine
+    working_dir: /src/apps/web
+    command: ["npm", "run", "dev"]
+    volumes:
+      - ../..:/src
+      - web-node-modules:/src/apps/web/node_modules
+    ports:
+      - "5173:5173"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173/"]
+
+volumes:
+  go-mod-cache:
+  web-node-modules:

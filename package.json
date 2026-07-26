@@ -1,0 +1,9 @@
+{
+  "name": "flooks",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix apps/web run dev",
+    "build:web": "npm --prefix apps/web run build",
+    "test:web": "npm --prefix apps/web run test"
+  }
+}

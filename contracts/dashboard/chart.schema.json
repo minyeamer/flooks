@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flooks.io/schema/chart-v1alpha1.json",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {"const": "flooks.io/v1alpha1"},
+    "kind": {"const": "Chart"},
+    "metadata": {"type": "object", "required": ["name", "title"], "properties": {"name": {"type": "string"}, "title": {"type": "string"}}},
+    "spec": {
+      "type": "object",
+      "required": ["datasetKey", "visualization", "query"],
+      "properties": {
+        "datasetKey": {"type": "string"},
+        "visualization": {"type": "object", "required": ["type"], "properties": {"type": {"enum": ["kpi", "line", "bar", "table"]}, "stacked": {"type": "boolean"}, "valueFormat": {"enum": ["number", "currency", "percent"]}}},
+        "query": {"type": "object"}
+      }
+    }
+  }
+}

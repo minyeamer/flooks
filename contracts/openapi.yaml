@@ -1,0 +1,114 @@
+openapi: 3.0.3
+info: {title: Flooks API, version: 0.1.0}
+servers: [{url: /api/v1}]
+paths:
+  /health/live:
+    get: {operationId: live, responses: {"200": {description: Live}}}
+  /health/ready:
+    get: {operationId: ready, responses: {"200": {description: Ready}}}
+  /system/status:
+    get:
+      operationId: systemStatus
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SystemStatus"}
+  /datasets:
+    get: {operationId: listDatasets, responses: {"200": {description: Datasets}}}
+  /datasets/{key}:
+    get:
+      operationId: getDataset
+      parameters: [{in: path, name: key, required: true, schema: {type: string}}]
+      responses: {"200": {description: Dataset}}
+  /query/validate:
+    post:
+      operationId: validateQuery
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/QuerySpec"}}}}
+      responses: {"200": {description: Validated query}}
+  /query/execute:
+    post:
+      operationId: executeQuery
+      parameters: [{in: query, name: refresh, schema: {type: boolean, default: false}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/QuerySpec"}}}}
+      responses: {"200": {description: Query result}}
+  /assets/{kind}:
+    get:
+      operationId: listAssets
+      parameters: [{$ref: "#/components/parameters/Kind"}]
+      responses: {"200": {description: Assets}}
+    post:
+      operationId: createAsset
+      parameters: [{$ref: "#/components/parameters/Kind"}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/AssetWrite"}}}}
+      responses: {"201": {description: Created}}
+  /assets/{kind}/{id}:
+    get:
+      operationId: getAsset
+      parameters: [{$ref: "#/components/parameters/Kind"}, {$ref: "#/components/parameters/Id"}]
+      responses: {"200": {description: Asset}}
+    put:
+      operationId: updateAsset
+      parameters: [{$ref: "#/components/parameters/Kind"}, {$ref: "#/components/parameters/Id"}, {in: header, name: If-Match, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/AssetWrite"}}}}
+      responses: {"200": {description: Updated}, "412": {description: Revision conflict}}
+    delete:
+      operationId: archiveAsset
+      parameters: [{$ref: "#/components/parameters/Kind"}, {$ref: "#/components/parameters/Id"}]
+      responses: {"204": {description: Archived}}
+  /assets/{kind}/{id}/revisions:
+    get:
+      operationId: listRevisions
+      parameters: [{$ref: "#/components/parameters/Kind"}, {$ref: "#/components/parameters/Id"}]
+      responses: {"200": {description: Revisions}}
+  /assets/{kind}/{id}/revisions/{revision}/restore:
+    post:
+      operationId: restoreRevision
+      parameters: [{$ref: "#/components/parameters/Kind"}, {$ref: "#/components/parameters/Id"}, {in: path, name: revision, required: true, schema: {type: integer}}, {in: header, name: If-Match, required: true, schema: {type: string}}]
+      responses: {"200": {description: Restored}}
+  /events:
+    get: {operationId: events, responses: {"200": {description: SSE stream}}}
+components:
+  parameters:
+    Kind: {in: path, name: kind, required: true, schema: {enum: [charts, dashboards]}}
+    Id: {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    SystemStatus:
+      type: object
+      required: [service, version, principal, capabilities, dependencies]
+      properties:
+        service: {type: string}
+        version: {type: string}
+        principal: {type: string}
+        capabilities: {type: array, items: {type: string}}
+        dependencies:
+          type: object
+          required: [metadata, redis, analyticsDatasource]
+          properties:
+            metadata: {type: string, enum: [ok, down]}
+            redis: {type: string, enum: [ok, down]}
+            analyticsDatasource: {type: string, enum: [ok, degraded]}
+    QuerySpec:
+      type: object
+      required: [datasetKey, timeRange]
+      properties:
+        datasetKey: {type: string}
+        timeRange:
+          type: object
+          required: [start, end]
+          properties: {start: {type: string, format: date}, end: {type: string, format: date}}
+        dimensions: {type: array, items: {type: string}}
+        metrics: {type: array, items: {type: string}}
+        filters: {type: array, items: {type: object}}
+        sort: {type: array, items: {type: object}}
+        limit: {type: integer}
+        offset: {type: integer}
+    AssetWrite:
+      type: object
+      required: [slug, title, document]
+      properties:
+        slug: {type: string}
+        title: {type: string}
+        summary: {type: string}
+        document: {type: object}
