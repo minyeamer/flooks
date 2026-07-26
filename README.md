@@ -4,11 +4,33 @@ Flooks는 JSON과 UI가 같은 문서를 편집하는 오픈소스 대시보드 
 
 ## 빠른 시작
 
-1. `.env.example`을 `.env`로 복사하고 비어 있는 환경변수를 로컬에서 설정합니다. 실제 연결 정보는 저장소에 기록하지 않습니다.
-2. `docker compose -f deploy/compose/compose.yml up --build`를 실행합니다.
+1. 저장소 루트에서 `.env.example`을 `.env`로 복사하고 로컬 연결 정보를 설정합니다. 실제 연결 정보는 저장소에 기록하지 않습니다.
+2. 운영형 Compose를 시작합니다.
 3. <http://localhost:5740>을 엽니다.
 
-개발 환경은 `docker compose -f deploy/compose/compose.yml -f deploy/compose/compose.dev.yml up --build`로 실행합니다.
+```bash
+docker compose --project-directory . -p flooks \
+  -f deploy/compose/compose.yml up --build -d
+```
+
+개발 환경은 다음 명령으로 실행합니다.
+
+```bash
+docker compose --project-directory . -p flooks \
+  -f deploy/compose/compose.yml \
+  -f deploy/compose/compose.dev.yml up --build
+```
+
+## 종료
+
+데이터를 보존한 채 Flooks 컨테이너와 네트워크만 종료하려면 다음 명령을 실행합니다.
+
+```bash
+docker compose --project-directory . -p flooks \
+  -f deploy/compose/compose.yml down
+```
+
+`down -v`는 metadata 데이터 볼륨까지 삭제하므로 사용하지 않습니다.
 
 ## 한국어 문서
 
