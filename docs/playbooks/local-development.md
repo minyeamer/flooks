@@ -11,13 +11,23 @@
 ## 실행
 
 ```bash
-docker compose -f deploy/compose/compose.yml -f deploy/compose/compose.dev.yml up --build
+docker compose --env-file .env -p flooks \
+  -f deploy/compose/compose.yml \
+  -f deploy/compose/compose.dev.yml up --build
 ```
 
 운영형 로컬 실행:
 
 ```bash
-docker compose -f deploy/compose/compose.yml up --build
+docker compose --env-file .env -p flooks \
+  -f deploy/compose/compose.yml up --build -d
+
+종료:
+
+```bash
+docker compose --env-file .env -p flooks \
+  -f deploy/compose/compose.yml down
+```
 ```
 
 API는 5741, Vite 개발 서버는 5173, 운영형 Web은 5740을 사용한다. `/api/v1/system/status`에서 metadata, Redis, 분석 데이터소스 상태를 확인한다. 분석 데이터소스 장애는 liveness를 실패시키지 않고 `analyticsDatasource`를 `degraded`로 표시한다.

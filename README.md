@@ -9,14 +9,14 @@ Flooks는 JSON과 UI가 같은 문서를 편집하는 오픈소스 대시보드 
 3. <http://localhost:5740>을 엽니다.
 
 ```bash
-docker compose --project-directory . -p flooks \
+docker compose --env-file .env -p flooks \
   -f deploy/compose/compose.yml up --build -d
 ```
 
 개발 환경은 다음 명령으로 실행합니다.
 
 ```bash
-docker compose --project-directory . -p flooks \
+docker compose --env-file .env -p flooks \
   -f deploy/compose/compose.yml \
   -f deploy/compose/compose.dev.yml up --build
 ```
@@ -26,7 +26,7 @@ docker compose --project-directory . -p flooks \
 데이터를 보존한 채 Flooks 컨테이너와 네트워크만 종료하려면 다음 명령을 실행합니다.
 
 ```bash
-docker compose --project-directory . -p flooks \
+docker compose --env-file .env -p flooks \
   -f deploy/compose/compose.yml down
 ```
 
@@ -40,6 +40,7 @@ docker compose --project-directory . -p flooks \
 - [대시보드 계약](docs/architecture/dashboard-contract.md)
 - [비밀정보 관리](docs/security/secret-management.md)
 - [로컬 개발](docs/playbooks/local-development.md)
+- [차트 편집기 사용법](docs/playbooks/chart-editor.md)
 - [구현 기록](docs/progress/work-log.md)
 - [검증 보고서](docs/reports/validation-2026-07-27.md)
 - [MVP 이후 로드맵](docs/roadmap/post-mvp.md)

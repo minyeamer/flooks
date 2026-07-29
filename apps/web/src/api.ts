@@ -1,4 +1,4 @@
-import type {Asset, ChartDocument, DashboardDocument, QueryResult, QuerySpec} from './types';
+import type {Asset, ChartDocument, DashboardDocument, DatasetManifest, QueryResult, QuerySpec} from './types';
 
 const base = '/api/v1';
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -21,6 +21,7 @@ export const api = {
   restore: <T>(kind: 'charts' | 'dashboards', asset: Asset<T>, revision: number) =>
     request<Asset<T>>(`/assets/${kind}/${asset.id}/revisions/${revision}/restore`, {method: 'POST', headers: {'If-Match': `"${asset.latestRevision}"`}}),
   query: (spec: QuerySpec, refresh = false) => request<QueryResult>(`/query/execute?refresh=${refresh}`, {method: 'POST', body: JSON.stringify(spec)}),
+  datasets: () => request<DatasetManifest[]>('/datasets'),
   status: () => request<{dependencies: {metadata: 'ok' | 'down'; redis: 'ok' | 'down'; analyticsDatasource: 'ok' | 'degraded'}}>('/system/status'),
 };
 

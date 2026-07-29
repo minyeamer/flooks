@@ -9,13 +9,43 @@ export type QuerySpec = {
   offset?: number;
 };
 
+export type DatasetDimension = {
+  key: string;
+  label: string;
+  type: 'string' | 'date';
+  filterOperators: ('eq' | 'in' | 'contains' | 'between' | 'isNull')[];
+};
+
+export type DatasetMetric = {
+  key: string;
+  label: string;
+  type: string;
+  format?: 'number' | 'currency' | 'percent';
+};
+
+export type DatasetManifest = {
+  version: number;
+  key: string;
+  label: string;
+  connector: string;
+  dimensions: DatasetDimension[];
+  metrics: DatasetMetric[];
+  limits: {defaultRows: number; maxRows: number; timeoutSeconds: number};
+  cache: {ttlSeconds: number};
+};
+
 export type ChartDocument = {
   apiVersion: 'flooks.io/v1alpha1';
   kind: 'Chart';
   metadata: {name: string; title: string};
   spec: {
     datasetKey: string;
-    visualization: {type: 'kpi' | 'line' | 'bar' | 'table'; stacked?: boolean; valueFormat?: 'number' | 'currency' | 'percent'};
+    visualization: {
+      type: 'kpi' | 'line' | 'bar' | 'table';
+      stacked?: boolean;
+      valueFormat?: 'number' | 'currency' | 'percent';
+      table?: {layout: 'fit' | 'fixed'; frozenColumns?: number; columnWidths?: Record<string, number>};
+    };
     query: QuerySpec;
   };
 };

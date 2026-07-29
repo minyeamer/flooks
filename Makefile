@@ -15,5 +15,5 @@ build:
 	npm --prefix apps/web run build
 
 compose-config:
-	docker compose -f deploy/compose/compose.yml config --quiet
-	docker compose -f deploy/compose/compose.yml -f deploy/compose/compose.dev.yml config --quiet
+	docker compose --env-file .env -p flooks -f deploy/compose/compose.yml config --quiet
+	docker compose --env-file .env -p flooks -f deploy/compose/compose.yml -f deploy/compose/compose.dev.yml config --quiet

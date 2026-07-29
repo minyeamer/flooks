@@ -1,5 +1,20 @@
 # 구현 기록
 
+## 2026-07-29: 표 열 너비와 고정 표시
+
+- 표 차트의 기본 표시를 고정 table layout으로 바꿔 긴 텍스트 열이 숫자 지표를 화면 밖으로 밀어내지 않게 했다.
+- ChartDocument `spec.visualization.table`에 `layout`, `columnWidths`, `frozenColumns` 계약을 추가했다. 맞춤 모드는 상대 비율로 컨테이너 폭을 채우고, 고정 모드는 픽셀 너비와 가로 스크롤을 사용한다.
+- 차트 설정 패널에서 열별 너비와 고정할 왼쪽 열 수를 편집할 수 있게 했으며, 같은 설정은 JSON 고급 편집에서도 수정할 수 있다.
+
+## 2026-07-29: UI 기반 차트 편집기
+
+- ChartAsset 편집 화면을 JSON 중심 3열 화면에서 미리보기와 우측 설정 패널 중심으로 재구성했다. JSON 직접 편집과 import/export는 `JSON 고급 편집`에 유지했다.
+- `/api/v1/datasets`의 Dataset Manifest를 읽어 데이터셋, 차원, 지표, 필터, 정렬의 선택지를 만들었다. 화면 코드에 특정 데이터셋의 필드 목록을 하드코딩하지 않는다.
+- 차원·지표를 chip 형태로 추가·삭제할 수 있게 했고, KPI의 단일 지표 제한, 막대의 누적 표시, 표의 페이지 크기, 값 형식을 설정할 수 있게 했다.
+- QuerySpec 필터의 `eq`, `in`, `contains`, `between`, `isNull`을 UI에서 입력할 수 있게 했으며, 배열·boolean 값으로 정확히 변환한다. 필터가 미완성인 경우 미리보기와 저장을 막는다.
+- `docs/playbooks/chart-editor.md`에 사용 흐름과 현재 범위를 기록하고, 차트 계약과 QuerySpec 문서에 UI-Manifest 연결 규칙을 반영했다.
+- `go test ./...`, `npm --prefix apps/web test -- --run`, `npm --prefix apps/web run build`, `make compose-config`를 통과했다. Vite 빌드는 Monaco와 ECharts에 따른 500 kB 초과 chunk 경고를 남긴다.
+
 ## 2026-07-27: 초기 MVP 구현 진행
 
 - 한국어 계획, 아키텍처, QuerySpec, dashboard contract, ADR, 로컬 개발, 후속 로드맵 문서 기준선을 만들었다.

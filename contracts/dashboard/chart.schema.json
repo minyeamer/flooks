@@ -13,7 +13,7 @@
       "required": ["datasetKey", "visualization", "query"],
       "properties": {
         "datasetKey": {"type": "string"},
-        "visualization": {"type": "object", "required": ["type"], "properties": {"type": {"enum": ["kpi", "line", "bar", "table"]}, "stacked": {"type": "boolean"}, "valueFormat": {"enum": ["number", "currency", "percent"]}}},
+        "visualization": {"type": "object", "required": ["type"], "properties": {"type": {"enum": ["kpi", "line", "bar", "table"]}, "stacked": {"type": "boolean"}, "valueFormat": {"enum": ["number", "currency", "percent"]}, "table": {"type": "object", "properties": {"layout": {"enum": ["fit", "fixed"]}, "frozenColumns": {"type": "integer", "minimum": 0}, "columnWidths": {"type": "object", "additionalProperties": {"type": "number", "exclusiveMinimum": 0}}}}}},
         "query": {"type": "object"}
       }
     }
