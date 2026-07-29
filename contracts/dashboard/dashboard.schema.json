@@ -17,8 +17,9 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["chartId", "chartRevision", "x", "y", "w", "h"],
+            "required": ["id", "chartId", "chartRevision", "x", "y", "w", "h"],
             "properties": {
+              "id": {"type": "string", "minLength": 1},
               "chartId": {"type": "string"},
               "chartRevision": {"type": "integer", "minimum": 1},
               "x": {"type": "integer", "minimum": 0},

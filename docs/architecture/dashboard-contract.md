@@ -29,4 +29,20 @@ ChartDocument와 DashboardDocument는 `apiVersion: flooks.io/v1alpha1`과 `kind`
 
 Dashboard V1은 단일 페이지와 12열 grid를 사용한다. Desktop 좌표가 canonical이며 좁은 화면은 y/x 순서의 단일 열 view mode다.
 
+## 대시보드 내 차트 편집
+
+Dashboard placement는 안정적인 `id`와 `chartId`, `chartRevision`을 가진다. `id`는 grid, 선택 상태, 조회 결과를 구분하는 패널 인스턴스 식별자다. 같은 ChartAsset을 여러 패널에 배치해도 각 패널은 독립적으로 위치·조회 상태·pinned revision을 가진다.
+
+기존에 placement `id`가 없는 DashboardDocument는 Web이 `chartId`, revision, 좌표, 배열 순서에서 결정론적인 legacy ID를 만들어 호환 로드한다. 다음 대시보드 저장 시 생성된 ID가 document에 포함된다.
+
+대시보드에서 패널을 선택하면 pinned ChartDocument revision을 우측 편집기에서 draft로 연다.
+
+1. `차트 저장`은 ChartAsset의 새 immutable revision을 만든다.
+2. 성공하면 현재 대시보드 draft의 선택 placement만 새 revision을 pin한다.
+3. `대시보드 저장`을 눌러야 placement 변경이 Dashboard revision으로 저장된다.
+
+따라서 차트 저장 후 대시보드를 저장하지 않고 닫아도 새 ChartAsset revision은 남지만, 기존 대시보드의 pinned revision은 변하지 않는다. 다른 dashboard와 다른 placement도 자동으로 갱신하지 않는다. ChartAsset 저장의 ETag 충돌은 자동 병합하거나 덮어쓰지 않고 오류로 표시한다.
+
+패널 삭제는 placement만 제거하고 ChartAsset을 archive하거나 삭제하지 않는다. 패널 복제는 동일한 `chartId`와 pinned revision을 새 placement ID와 기본 좌표로 추가한다.
+
 Export는 portable document를 반환한다. Dashboard bundle은 pinned chart revision을 포함한다. Import는 schema 검증과 충돌 preview 후 새 애셋 또는 새 revision으로 적용한다.

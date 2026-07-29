@@ -1,5 +1,14 @@
 # 구현 기록
 
+## 2026-07-29: 대시보드 내 차트 편집 drawer
+
+- Dashboard placement에 안정적인 ID를 추가하고 기존 ID 없는 document를 결정론적인 legacy ID로 호환 로드하도록 했다.
+- 대시보드 패널을 클릭하면 우측 drawer에서 pinned ChartAsset revision을 직접 편집하도록 구현했다. 작은 화면에서는 drawer가 전체 화면으로 전환된다.
+- 기존 ChartEditor의 설정 UI를 재사용 가능한 `ChartSettingsPanel`로 분리해 차트 애셋 화면과 대시보드 drawer가 같은 ChartDocument 편집 규칙을 사용하게 했다.
+- drawer에서 차트를 저장하면 새 immutable revision을 만들고 선택 placement의 pinned revision만 대시보드 draft에 반영한다. 대시보드 저장은 별도 작업으로 유지한다.
+- placement ID 기준으로 패널 조회 상태, loading/error, 새로고침, 복제, 삭제, 최신 revision 갱신을 구현했다.
+- dashboard contract와 사용 playbook을 갱신했다. Web Vitest와 production build를 통과했다.
+
 ## 2026-07-29: 지속 가능한 개발 작업 지침
 
 - 루트 `AGENTS.md`에 저장소 지도, 문서 탐색 순서, 보안 원칙, 완료 기준을 추가했다.

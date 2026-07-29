@@ -5,3 +5,4 @@ apps/web/dist/
 coverage/
 *.log
 .DS_Store
+tmp/

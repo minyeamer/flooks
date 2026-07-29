@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/charteditor.test.ts","./src/charteditor.tsx","./src/chartrenderer.tsx","./src/dashboardeditor.tsx","./src/api.ts","./src/main.tsx","./src/types.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/charteditor.test.ts","./src/charteditor.tsx","./src/chartrenderer.tsx","./src/chartsettingspanel.tsx","./src/dashboardeditor.tsx","./src/api.ts","./src/chartediting.ts","./src/dashboardplacements.test.ts","./src/dashboardplacements.ts","./src/main.tsx","./src/types.ts"],"version":"5.9.3"}

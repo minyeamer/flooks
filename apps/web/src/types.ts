@@ -50,7 +50,7 @@ export type ChartDocument = {
   };
 };
 
-export type Placement = {chartId: string; chartRevision: number; x: number; y: number; w: number; h: number};
+export type Placement = {id: string; chartId: string; chartRevision: number; x: number; y: number; w: number; h: number};
 export type DashboardDocument = {
   apiVersion: 'flooks.io/v1alpha1';
   kind: 'Dashboard';

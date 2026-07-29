@@ -5,7 +5,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(base + path, {headers: {'Content-Type': 'application/json', ...init?.headers}, ...init});
   if (!response.ok) {
     const problem = await response.json().catch(() => ({title: response.statusText}));
-    throw new Error(problem.detail || problem.title);
+    const error = new Error(problem.detail || problem.title) as Error & {status?: number};
+    error.status = response.status;
+    throw error;
   }
   if (response.status === 204) return undefined as T;
   return response.json();
