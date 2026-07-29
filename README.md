@@ -41,6 +41,7 @@ docker compose --env-file .env -p flooks \
 - [비밀정보 관리](docs/security/secret-management.md)
 - [로컬 개발](docs/playbooks/local-development.md)
 - [차트 편집기 사용법](docs/playbooks/chart-editor.md)
+- [개발 작업 흐름과 커밋 규칙](docs/engineering/development-workflow.md)
 - [구현 기록](docs/progress/work-log.md)
 - [검증 보고서](docs/reports/validation-2026-07-27.md)
 - [MVP 이후 로드맵](docs/roadmap/post-mvp.md)
